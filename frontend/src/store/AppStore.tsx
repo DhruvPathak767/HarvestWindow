@@ -29,7 +29,12 @@ import {
   type NewFarmInput,
   type UpdateFarmInput,
 } from "@/services/api";
-import { localStore, type PersistedSnapshot } from "@/services/storage/localStore";
+import {
+  buildEmptySnapshot,
+  buildSeedSnapshot,
+  localStore,
+  type PersistedSnapshot,
+} from "@/services/storage/localStore";
 import { DEFAULT_SETTINGS, DEMO_CREDENTIALS, DEMO_USER } from "@/data/mock/seed";
 import { setLocale } from "@/utils/date";
 import { useToast } from "@/components/feedback/ToastProvider";
@@ -52,8 +57,15 @@ export interface OnboardingDraft {
   farmName: string;
   state: string;
   district: string;
+  village?: string;
+  pincode?: string;
+  soilType?: string;
+  irrigationSource?: string;
+  latitude?: number | null;
+  longitude?: number | null;
   area: number;
   areaUnit: Farm["areaUnit"];
+  notes?: string;
   cropName: string;
   variety: string;
   plantingDate: string;
@@ -138,30 +150,37 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     setReady(false);
     setLoadError(null);
     try {
-      const data = await api.loadSnapshot();
-
-      // Restore authentication from server state rather than trusting local storage
+      // 1. Restore authentication from server state rather than trusting local storage
+      let authUser: { id: string; name: string; email: string; role: Role } | null = null;
       try {
         const authResult = await authClient.getMe();
         if (authResult?.user) {
-          data.signedIn = true;
-          data.user = {
-            fullName: authResult.user.name,
-            email: authResult.user.email,
-            role: authResult.user.role,
-            organisation: data.user?.organisation || "HarvestWindow Farm",
-          };
-        } else {
-          data.signedIn = false;
+          authUser = authResult.user;
         }
       } catch {
         // No active or valid session exists on server
+      }
+
+      // 2. Fetch snapshot scoped to identified user (or demo key if unauthenticated)
+      const data = await api.loadSnapshot(authUser?.email || null);
+
+      if (authUser) {
+        data.signedIn = true;
+        data.user = {
+          fullName: authUser.name,
+          email: authUser.email,
+          role: authUser.role,
+          organisation:
+            data.user?.organisation ||
+            (authUser.role === "SELLER" ? "Merchant / Trading" : "HarvestWindow Farm"),
+        };
+      } else {
         data.signedIn = false;
       }
 
       setSnapshot(data);
       hydrated.current = true;
-      setSelectedFarmId(data.settings.defaultFarmId ?? data.farms[0]?.id ?? ALL_FARMS);
+      setSelectedFarmId(data.settings?.defaultFarmId ?? data.farms[0]?.id ?? ALL_FARMS);
       setReady(true);
     } catch {
       setLoadError(
@@ -175,10 +194,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     void load();
   }, [load]);
 
-  // Persist the demo snapshot locally (never cloud-synced in this frontend).
+  // Persist the snapshot locally under user-scoped storage key
   useEffect(() => {
     if (!hydrated.current) return;
-    localStore.save(snapshot);
+    localStore.save(snapshot, snapshot.signedIn ? snapshot.user?.email : null);
   }, [snapshot]);
 
   // Language preference drives date/number formatting across the workspace.
@@ -253,21 +272,57 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         if (result.accessToken) {
           setAuthToken(result.accessToken);
         }
-        patch((prev) => ({
-          ...prev,
+
+        const isDemo = normalized === DEMO_CREDENTIALS.email;
+        const userSnapshot =
+          localStore.load(result.user.email) ??
+          (isDemo ? buildSeedSnapshot() : buildEmptySnapshot({ email: result.user.email }));
+
+        let liveFarms = userSnapshot.farms;
+        try {
+          const fetched = await api.listFarms();
+          if (Array.isArray(fetched)) {
+            liveFarms = fetched;
+          }
+        } catch (fetchErr) {
+          console.warn("[AppStore] Could not fetch live farms on sign-in:", fetchErr);
+        }
+
+        const farmIdSet = new Set(liveFarms.map((f) => f.id));
+        const validCrops = isDemo
+          ? userSnapshot.crops
+          : userSnapshot.crops.filter((c) => farmIdSet.has(c.farmId));
+
+        const updatedSnapshot: PersistedSnapshot = {
+          ...userSnapshot,
+          farms: liveFarms,
+          crops: validCrops,
           signedIn: true,
           user: {
             fullName: result.user.name,
             email: result.user.email,
             role: result.user.role,
-            organisation: prev.user?.organisation || "HarvestWindow Farm",
+            organisation:
+              userSnapshot.user?.organisation ||
+              (result.user.role === "SELLER" ? "Merchant / Trading" : "HarvestWindow Farm"),
           },
-        }));
+        };
+
+        setSnapshot(updatedSnapshot);
+        setSelectedFarmId(
+          updatedSnapshot.settings?.defaultFarmId ?? liveFarms[0]?.id ?? ALL_FARMS
+        );
+        localStore.save(updatedSnapshot, result.user.email);
         return { ok: true };
       } catch (err: unknown) {
         // Fallback to demo credentials if offline or local demo
         if (normalized === DEMO_CREDENTIALS.email && password === DEMO_CREDENTIALS.password) {
-          patch((prev) => ({ ...prev, signedIn: true, user: DEMO_USER }));
+          const demoSnap = buildSeedSnapshot();
+          demoSnap.signedIn = true;
+          demoSnap.user = DEMO_USER;
+          setSnapshot(demoSnap);
+          setSelectedFarmId(demoSnap.settings?.defaultFarmId ?? demoSnap.farms[0]?.id ?? ALL_FARMS);
+          localStore.save(demoSnap, DEMO_CREDENTIALS.email);
           return { ok: true };
         }
         const message =
@@ -280,7 +335,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         };
       }
     },
-    [patch]
+    []
   );
 
   const startDemoSession = useCallback(async () => {
@@ -289,8 +344,13 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     } catch {
       /* ignore offline */
     }
-    patch((prev) => ({ ...prev, signedIn: true, user: DEMO_USER }));
-  }, [patch]);
+    const demoSnap = buildSeedSnapshot();
+    demoSnap.signedIn = true;
+    demoSnap.user = DEMO_USER;
+    setSnapshot(demoSnap);
+    setSelectedFarmId(demoSnap.settings?.defaultFarmId ?? demoSnap.farms[0]?.id ?? ALL_FARMS);
+    localStore.save(demoSnap, DEMO_CREDENTIALS.email);
+  }, []);
 
   const signUp = useCallback<StoreValue["signUp"]>(
     async ({ fullName, email, password, role = "FARMER" }) => {
@@ -309,16 +369,35 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           setAuthToken(result.accessToken);
         }
 
-        patch((prev) => ({
-          ...prev,
-          signedIn: true,
+        // A newly registered user has 0 farms; query live server to ensure exact sync
+        let liveFarms: Farm[] = [];
+        try {
+          const fetched = await api.listFarms();
+          if (Array.isArray(fetched)) liveFarms = fetched;
+        } catch {
+          liveFarms = [];
+        }
+
+        const freshSnapshot: PersistedSnapshot = {
+          version: 1,
+          farms: liveFarms,
+          crops: [],
+          recommendations: [],
+          activity: [],
+          settings: structuredClone(DEFAULT_SETTINGS),
           user: {
             fullName: result.user.name,
             email: result.user.email,
             role: result.user.role,
             organisation: role === "SELLER" ? "Merchant / Trading" : "Independent Producer",
           },
-        }));
+          signedIn: true,
+          onboarded: false,
+        };
+
+        setSnapshot(freshSnapshot);
+        setSelectedFarmId(ALL_FARMS);
+        localStore.save(freshSnapshot, result.user.email);
         return { ok: true };
       } catch (err: unknown) {
         const message =
@@ -331,15 +410,18 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         };
       }
     },
-    [patch]
+    []
   );
 
   const signOut = useCallback(() => {
     void authClient.logout();
     setAuthToken(null);
-    patch((prev) => ({ ...prev, signedIn: false }));
+    const loggedOutSnap = buildSeedSnapshot();
+    loggedOutSnap.signedIn = false;
+    setSnapshot(loggedOutSnap);
+    setSelectedFarmId(ALL_FARMS);
     setShowOnboarding(false);
-  }, [patch]);
+  }, []);
 
   /* ------------------------------------------------------------ onboarding */
 
@@ -355,8 +437,17 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         name: draft.farmName,
         state: draft.state,
         district: draft.district,
+        villageOrTaluka: draft.village || undefined,
+        village: draft.village || undefined,
+        postalCode: draft.pincode || undefined,
+        pincode: draft.pincode || undefined,
+        soilType: draft.soilType || undefined,
+        irrigationSource: draft.irrigationSource || undefined,
+        latitude: draft.latitude !== undefined ? draft.latitude : null,
+        longitude: draft.longitude !== undefined ? draft.longitude : null,
         area: draft.area,
         areaUnit: draft.areaUnit,
+        notes: draft.notes || undefined,
       });
       const { crop } = await api.createCrop({
         name: draft.cropName,

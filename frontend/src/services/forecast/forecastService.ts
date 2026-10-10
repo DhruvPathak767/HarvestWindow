@@ -59,9 +59,11 @@ function readWeatherSignal(
 ): WeatherSignal | null {
   if (!weather || weather.daily.length === 0) return null;
 
+  const rangeStart = addDays(windowStart, -3);
+  const rangeEnd = addDays(windowEnd, 3);
   const relevant = weather.daily.filter((d) => {
-    const day = new Date(d.date);
-    return day >= addDays(windowStart, -3) && day <= addDays(windowEnd, 3);
+    const day = toDate(d.date);
+    return day >= rangeStart && day <= rangeEnd;
   });
 
   const heavyRainDays = weather.daily.filter((d) => d.rainfallMm >= 15).length;
@@ -104,7 +106,7 @@ function buildStagePlan(
 ): GrowthStagePoint[] {
   const stages = STAGE_TEMPLATES[templateName] as readonly string[];
   const boundaries = TEMPLATE_BOUNDARIES[templateName];
-  const planted = new Date(crop.plantingDate);
+  const planted = toDate(crop.plantingDate);
   const preWindowDays = Math.max(daysBetween(planted, windowStart), stages.length * 3);
   const today = startOfToday();
   const points: GrowthStagePoint[] = stages.map((stage, i) => {
@@ -166,7 +168,7 @@ export function computeForecast(
   const entry = findCatalogEntry(crop.name);
   const [minDays, maxDays] = entry?.durationRange ?? FALLBACK_RANGE;
   const templateName = entry?.stageTemplateName ?? "cerealGrain";
-  const planted = new Date(crop.plantingDate);
+  const planted = toDate(crop.plantingDate);
 
   const baseStart = addDays(planted, minDays);
   const baseEnd = addDays(planted, Math.max(maxDays, minDays + 7));

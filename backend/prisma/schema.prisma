@@ -15,6 +15,11 @@ enum Role {
   ADMIN
 }
 
+enum AreaUnit {
+  HECTARE
+  ACRE
+}
+
 model User {
   id              String           @id @default(cuid())
   name            String           @db.VarChar(120)
@@ -49,26 +54,26 @@ model RefreshSession {
   @@map("refresh_sessions")
 }
 
-// Farm model for Phase 2 Farm Management
+// Farm model matching updated specifications
 model Farm {
-  id               String   @id @default(cuid())
-  userId           String   @db.VarChar(191)
-  name             String   @db.VarChar(120)
-  state            String   @db.VarChar(100)
-  district         String   @db.VarChar(100)
-  soilType         String?  @db.VarChar(100)
-  irrigationSource String?  @db.VarChar(100)
-  village          String?  @db.VarChar(120)
-  pincode          String?  @db.VarChar(20)
-  latitude         Decimal? @db.Decimal(10, 6)
-  longitude        Decimal? @db.Decimal(10, 6)
-  area             Decimal  @db.Decimal(12, 2)
-  areaUnit         String   @default("hectare") @db.VarChar(20) // "hectare" | "acre"
-  notes            String?  @db.Text
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id               String    @id @default(cuid())
+  userId           String    @db.VarChar(191)
+  name             String    @db.VarChar(120)
+  state            String    @db.VarChar(100)
+  district         String    @db.VarChar(100)
+  villageOrTaluka  String?   @db.VarChar(120)
+  postalCode       String?   @db.VarChar(10)
+  soilType         String?   @db.VarChar(50)
+  irrigationSource String?   @db.VarChar(50)
+  area             Decimal   @db.Decimal(12, 2)
+  areaUnit         AreaUnit  @default(HECTARE)
+  latitude         Decimal?  @db.Decimal(10, 6)
+  longitude        Decimal?  @db.Decimal(10, 6)
+  notes            String?   @db.Text
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("farms")

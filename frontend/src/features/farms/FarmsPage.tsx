@@ -30,7 +30,13 @@ export default function FarmsPage() {
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
     return farms
-      .filter((f) => !q || `${f.name} ${f.district} ${f.state}`.toLowerCase().includes(q))
+      .filter(
+        (f) =>
+          !q ||
+          `${f.name} ${f.district} ${f.state} ${f.village || f.villageOrTaluka || ""} ${f.pincode || f.postalCode || ""}`
+            .toLowerCase()
+            .includes(q)
+      )
       .map((farm) => {
         const farmCrops = crops.filter((c) => c.farmId === farm.id);
         const counts = STATUS_ORDER.reduce<Record<string, number>>((acc, s) => {
@@ -114,7 +120,7 @@ export default function FarmsPage() {
                         </p>
                       </div>
                       <span className="hw-num shrink-0 rounded-sm bg-soft px-2.5 py-1 text-[12.5px] font-bold text-forest-deep">
-                        {farm.area} {farm.areaUnit === "hectare" ? "ha" : "ac"}
+                        {farm.area} {String(farm.areaUnit).toLowerCase() === "acre" ? "ac" : "ha"}
                       </span>
                     </div>
 

@@ -1,9 +1,9 @@
 const MS_PER_DAY = 86_400_000;
 
 export function toDate(value: string | Date): Date {
-  if (value instanceof Date) return value;
+  if (value instanceof Date) return new Date(value.getTime());
   // Plain yyyy-mm-dd is parsed as local time to avoid off-by-one day errors.
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
     const [y, m, d] = value.split("-").map(Number);
     return new Date(y, m - 1, d);
   }
@@ -24,8 +24,9 @@ export function toISODate(value: string | Date): string {
 
 export function addDays(value: string | Date, days: number): Date {
   const d = toDate(value);
-  d.setDate(d.getDate() + days);
-  return d;
+  const result = new Date(d.getTime());
+  result.setDate(result.getDate() + days);
+  return result;
 }
 
 function dayIndex(value: string | Date): number {

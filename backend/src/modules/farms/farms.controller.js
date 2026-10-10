@@ -6,7 +6,15 @@ import * as farmService from "./farms.service.js";
  */
 export async function handleListFarms(req, res, next) {
   try {
-    const farms = await farmService.listFarms(req.user.id);
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required.",
+      });
+    }
+
+    const farms = await farmService.listFarms(userId);
     return res.status(200).json({
       success: true,
       data: farms,
@@ -22,7 +30,15 @@ export async function handleListFarms(req, res, next) {
  */
 export async function handleGetFarm(req, res, next) {
   try {
-    const farm = await farmService.getFarmById(req.user.id, req.params.farmId);
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required.",
+      });
+    }
+
+    const farm = await farmService.getFarmById(userId, req.params.farmId);
     if (!farm) {
       return res.status(404).json({
         success: false,
@@ -44,7 +60,15 @@ export async function handleGetFarm(req, res, next) {
  */
 export async function handleCreateFarm(req, res, next) {
   try {
-    const farm = await farmService.createFarm(req.user.id, req.body);
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required.",
+      });
+    }
+
+    const farm = await farmService.createFarm(userId, req.body);
     return res.status(201).json({
       success: true,
       data: farm,
@@ -60,8 +84,16 @@ export async function handleCreateFarm(req, res, next) {
  */
 export async function handleUpdateFarm(req, res, next) {
   try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required.",
+      });
+    }
+
     const updated = await farmService.updateFarm(
-      req.user.id,
+      userId,
       req.params.farmId,
       req.body
     );
@@ -86,7 +118,15 @@ export async function handleUpdateFarm(req, res, next) {
  */
 export async function handleDeleteFarm(req, res, next) {
   try {
-    const deleted = await farmService.deleteFarm(req.user.id, req.params.farmId);
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required.",
+      });
+    }
+
+    const deleted = await farmService.deleteFarm(userId, req.params.farmId);
     if (!deleted) {
       return res.status(404).json({
         success: false,

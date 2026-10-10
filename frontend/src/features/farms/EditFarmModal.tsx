@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { CheckCircle2, Compass, LocateFixed, MapPin, TriangleAlert } from "lucide-react";
 import { Modal } from "@/components/common/Modal";
 import { Button } from "@/components/common/ui";
 import {
@@ -14,6 +15,7 @@ import { INDIAN_STATES } from "@/data/mock/cropCatalog";
 import { useStore } from "@/store/AppStore";
 import type { Farm } from "@/types";
 import { SOIL_TYPE_OPTIONS, IRRIGATION_SOURCE_OPTIONS } from "./AddFarmModal";
+import { detectBrowserLocation } from "@/services/location/geolocationService";
 
 const coord = (min: number, max: number, name: string) =>
   z
@@ -24,29 +26,47 @@ const coord = (min: number, max: number, name: string) =>
       message: `${name} must be a number between ${min} and ${max}`,
     });
 
-const schema = z.object({
-  name: z.string().trim().min(2, "Give the farm a recognisable name").max(100),
-  state: z.string().min(2, "Select the state"),
-  district: z.string().trim().min(2, "Enter the district or locality").max(100),
-  village: z.string().trim().max(100).optional(),
-  pincode: z.string().trim().max(10).optional(),
-  soilType: z.string().optional(),
-  irrigationSource: z.string().optional(),
-  latitude: coord(-90, 90, "Latitude"),
-  longitude: coord(-180, 180, "Longitude"),
-  area: z
-    .string()
-    .trim()
-    .min(1, "Enter the field size")
-    .refine((v) => !Number.isNaN(Number(v)) && Number(v) > 0, {
-      message: "Field size must be a number greater than zero",
-    })
-    .refine((v) => Number(v) <= 100000, {
-      message: "That looks larger than a real holding",
-    }),
-  areaUnit: z.enum(["hectare", "acre"]),
-  notes: z.string().trim().max(300, "Keep notes under 300 characters").optional(),
-});
+const schema = z
+  .object({
+    name: z.string().trim().min(2, "Give the farm a recognisable name").max(100),
+    state: z.string().min(2, "Select the state"),
+    district: z.string().trim().min(2, "Enter the district or locality").max(100),
+    village: z.string().trim().max(100).optional(),
+    pincode: z
+      .string()
+      .trim()
+      .optional()
+      .refine((v) => !v || /^\d{6}$/.test(v), {
+        message: "Postal code must be a 6-digit Indian PIN code",
+      }),
+    soilType: z.string().optional(),
+    irrigationSource: z.string().optional(),
+    latitude: coord(-90, 90, "Latitude"),
+    longitude: coord(-180, 180, "Longitude"),
+    area: z
+      .string()
+      .trim()
+      .min(1, "Enter the field size")
+      .refine((v) => !Number.isNaN(Number(v)) && Number(v) > 0, {
+        message: "Field size must be a number greater than zero",
+      })
+      .refine((v) => Number(v) <= 100000, {
+        message: "That looks larger than a real holding",
+      }),
+    areaUnit: z.enum(["hectare", "acre"]),
+    notes: z.string().trim().max(300, "Keep notes under 300 characters").optional(),
+  })
+  .refine(
+    (data) => {
+      const hasLat = Boolean(data.latitude && data.latitude.trim() !== "");
+      const hasLon = Boolean(data.longitude && data.longitude.trim() !== "");
+      return (hasLat && hasLon) || (!hasLat && !hasLon);
+    },
+    {
+      message: "Latitude and longitude must both be provided together",
+      path: ["longitude"],
+    }
+  );
 
 type FormValues = z.infer<typeof schema>;
 
@@ -62,7 +82,12 @@ export function EditFarmModal({
   const { updateFarm } = useStore();
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
-  const [unit, setUnit] = useState<FormValues["areaUnit"]>(farm.areaUnit || "hectare");
+  const [locating, setLocating] = useState(false);
+  const [locationSuccess, setLocationSuccess] = useState<string | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const initialUnit: FormValues["areaUnit"] =
+    String(farm.areaUnit).toLowerCase() === "acre" ? "acre" : "hectare";
+  const [unit, setUnit] = useState<FormValues["areaUnit"]>(initialUnit);
 
   const {
     register,
@@ -76,36 +101,67 @@ export function EditFarmModal({
       name: farm.name,
       state: farm.state,
       district: farm.district,
-      village: farm.village || "",
-      pincode: farm.pincode || "",
+      village: farm.village || farm.villageOrTaluka || "",
+      pincode: farm.pincode || farm.postalCode || "",
       soilType: farm.soilType || "",
       irrigationSource: farm.irrigationSource || "",
       latitude: farm.latitude ? String(farm.latitude) : "",
       longitude: farm.longitude ? String(farm.longitude) : "",
       area: String(farm.area),
-      areaUnit: farm.areaUnit,
+      areaUnit: initialUnit,
       notes: farm.notes || "",
     },
   });
 
+  const handleDetectLocation = async () => {
+    setLocating(true);
+    setLocationError(null);
+    setLocationSuccess(null);
+    try {
+      const loc = await detectBrowserLocation();
+      if (loc.state) setValue("state", loc.state, { shouldValidate: true });
+      if (loc.district) setValue("district", loc.district, { shouldValidate: true });
+      if (loc.village) setValue("village", loc.village, { shouldValidate: true });
+      if (loc.pincode) setValue("pincode", loc.pincode, { shouldValidate: true });
+      setValue("latitude", loc.latitude.toFixed(6), { shouldValidate: true });
+      setValue("longitude", loc.longitude.toFixed(6), { shouldValidate: true });
+      const desc = [loc.village, loc.district, loc.state].filter(Boolean).join(", ");
+      setLocationSuccess(
+        `Live location updated: ${desc || `${loc.latitude.toFixed(4)}, ${loc.longitude.toFixed(4)}`}`
+      );
+    } catch (err: unknown) {
+      setLocationError(
+        err instanceof Error
+          ? err.message
+          : "Unable to detect browser live location. Please allow location permissions."
+      );
+    } finally {
+      setLocating(false);
+    }
+  };
+
   useEffect(() => {
     if (open && farm) {
-      setUnit(farm.areaUnit || "hectare");
+      const u: FormValues["areaUnit"] =
+        String(farm.areaUnit).toLowerCase() === "acre" ? "acre" : "hectare";
+      setUnit(u);
       reset({
         name: farm.name,
         state: farm.state,
         district: farm.district,
-        village: farm.village || "",
-        pincode: farm.pincode || "",
+        village: farm.village || farm.villageOrTaluka || "",
+        pincode: farm.pincode || farm.postalCode || "",
         soilType: farm.soilType || "",
         irrigationSource: farm.irrigationSource || "",
         latitude: farm.latitude ? String(farm.latitude) : "",
         longitude: farm.longitude ? String(farm.longitude) : "",
         area: String(farm.area),
-        areaUnit: farm.areaUnit,
+        areaUnit: u,
         notes: farm.notes || "",
       });
       setServerError(null);
+      setLocationError(null);
+      setLocationSuccess(null);
     }
   }, [open, farm, reset]);
 
@@ -117,7 +173,9 @@ export function EditFarmModal({
         name: values.name,
         state: values.state,
         district: values.district,
+        villageOrTaluka: values.village || undefined,
         village: values.village || undefined,
+        postalCode: values.pincode || undefined,
         pincode: values.pincode || undefined,
         soilType: values.soilType || undefined,
         irrigationSource: values.irrigationSource || undefined,
@@ -142,6 +200,8 @@ export function EditFarmModal({
       open={open}
       onClose={() => {
         setServerError(null);
+        setLocationError(null);
+        setLocationSuccess(null);
         onClose();
       }}
       title={`Edit ${farm.name}`}
@@ -172,11 +232,55 @@ export function EditFarmModal({
             {serverError}
           </div>
         )}
+
+        {/* Live Location Action Banner */}
+        <div className="rounded-lg border border-forest/20 bg-gradient-to-r from-forest/5 via-cream/60 to-gold/10 p-3.5 shadow-sm">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-2.5">
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-forest text-cream shadow-xs">
+                <LocateFixed className="h-4 w-4" aria-hidden />
+              </span>
+              <div>
+                <p className="font-display text-[13px] font-bold text-forest-deep">
+                  Live Location · Browser GPS
+                </p>
+                <p className="text-[11.5px] leading-tight text-muted">
+                  Update location and GPS coordinates directly from Browser Geolocation API
+                </p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={handleDetectLocation}
+              loading={locating}
+              className="shrink-0 font-medium"
+            >
+              <Compass className="h-3.5 w-3.5 mr-1" aria-hidden />
+              Detect Current Location
+            </Button>
+          </div>
+          {locationSuccess && (
+            <div className="mt-2.5 flex items-center gap-1.5 rounded-md border border-living/30 bg-living/10 px-2.5 py-1.5 text-[12px] font-medium text-forest-deep">
+              <CheckCircle2 className="h-3.5 w-3.5 text-living shrink-0" aria-hidden />
+              <span>{locationSuccess}</span>
+            </div>
+          )}
+          {locationError && (
+            <div className="mt-2.5 flex items-center gap-1.5 rounded-md border border-danger/30 bg-[#fdf1ee] px-2.5 py-1.5 text-[12px] text-[#8d3a26]">
+              <TriangleAlert className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              <span>{locationError}</span>
+            </div>
+          )}
+        </div>
+
         <TextField
           label="Farm name"
           required
           placeholder="e.g. Greenridge Valley Holding"
           error={errors.name?.message}
+          leadingIcon={<MapPin className="h-4 w-4" aria-hidden />}
           {...register("name")}
         />
 

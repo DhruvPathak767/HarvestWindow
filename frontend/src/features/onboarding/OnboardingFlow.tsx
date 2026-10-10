@@ -4,10 +4,14 @@ import {
   ArrowLeft,
   ArrowRight,
   CalendarRange,
+  CheckCircle2,
+  Compass,
   Leaf,
+  LocateFixed,
   MapPin,
   Sparkles,
   Sprout,
+  TriangleAlert,
 } from "lucide-react";
 import { Modal } from "@/components/common/Modal";
 import { Button, StatusBadge } from "@/components/common/ui";
@@ -22,6 +26,8 @@ import { INDIAN_STATES } from "@/data/mock/cropCatalog";
 import { STAGE_TEMPLATES, type Crop, type Farm } from "@/types";
 import { computeForecast } from "@/services/forecast/forecastService";
 import { weatherService } from "@/services/weather/weatherService";
+import { detectBrowserLocation } from "@/services/location/geolocationService";
+import { SOIL_TYPE_OPTIONS, IRRIGATION_SOURCE_OPTIONS } from "@/features/farms/AddFarmModal";
 import {
   addDays,
   daysLabel,
@@ -44,8 +50,15 @@ const EMPTY_DRAFT: OnboardingDraft = {
   farmName: "",
   state: "Karnataka",
   district: "",
+  village: "",
+  pincode: "",
+  soilType: "",
+  irrigationSource: "",
+  latitude: null,
+  longitude: null,
   area: 0,
   areaUnit: "hectare",
+  notes: "",
   cropName: "",
   variety: "",
   plantingDate: toISODate(addDays(startOfToday(), -60)),
@@ -59,10 +72,46 @@ export function OnboardingFlow({ open }: { open: boolean }) {
   const [draft, setDraft] = useState<OnboardingDraft>(EMPTY_DRAFT);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [locationSuccess, setLocationSuccess] = useState<string | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
   const set = <K extends keyof OnboardingDraft>(key: K, value: OnboardingDraft[K]) => {
     setDraft((d) => ({ ...d, [key]: value }));
     setErrors((e) => ({ ...e, [key]: "" }));
+  };
+
+  const handleDetectLocation = async () => {
+    setLocating(true);
+    setLocationError(null);
+    setLocationSuccess(null);
+    try {
+      const res = await detectBrowserLocation();
+      set("latitude", res.latitude);
+      set("longitude", res.longitude);
+      if (res.state) {
+        const match = INDIAN_STATES.find(
+          (s) => s.toLowerCase() === res.state?.toLowerCase()
+        );
+        if (match) set("state", match);
+        else set("state", res.state);
+      }
+      if (res.district) set("district", res.district);
+      if (res.village) set("village", res.village);
+      if (res.pincode) set("pincode", res.pincode);
+
+      setLocationSuccess(
+        `Live GPS coordinates captured: ${res.latitude}°, ${res.longitude}° (Accuracy ±${res.accuracy}m)`
+      );
+    } catch (err: unknown) {
+      setLocationError(
+        err instanceof Error
+          ? err.message
+          : "Unable to detect browser live location. Please allow location permissions."
+      );
+    } finally {
+      setLocating(false);
+    }
   };
 
   const entry = useMemo(() => findCatalogEntry(draft.cropName), [draft.cropName]);
@@ -74,10 +123,21 @@ export function OnboardingFlow({ open }: { open: boolean }) {
       name: draft.farmName || "Your farm",
       state: draft.state,
       district: draft.district || "—",
+      village: draft.village || null,
+      villageOrTaluka: draft.village || null,
+      pincode: draft.pincode || null,
+      postalCode: draft.pincode || null,
+      soilType: draft.soilType || null,
+      irrigationSource: draft.irrigationSource || null,
+      latitude: draft.latitude ?? null,
+      longitude: draft.longitude ?? null,
       area: draft.area || 1,
       areaUnit: draft.areaUnit,
+      notes: draft.notes || null,
       createdAt: new Date().toISOString(),
     };
+    const isRainfed = draft.irrigationSource?.toLowerCase().includes("rainfed");
+    const isIrrigated = Boolean(draft.irrigationSource && !isRainfed);
     const tempCrop: Crop = {
       id: "onboarding-preview-crop",
       farmId: tempFarm.id,
@@ -86,7 +146,7 @@ export function OnboardingFlow({ open }: { open: boolean }) {
       plantingDate: draft.plantingDate,
       growthStage: draft.growthStage || undefined,
       fieldArea: draft.area || undefined,
-      irrigation: "mixed",
+      irrigation: isRainfed ? "rainfed" : isIrrigated ? "irrigated" : "mixed",
       createdAt: new Date().toISOString(),
     };
     return {
@@ -116,6 +176,8 @@ export function OnboardingFlow({ open }: { open: boolean }) {
   const close = useCallback(() => {
     setShowOnboarding(false);
     setStep(0);
+    setLocationSuccess(null);
+    setLocationError(null);
   }, [setShowOnboarding]);
 
   const next = () => {
@@ -129,6 +191,8 @@ export function OnboardingFlow({ open }: { open: boolean }) {
       await completeOnboarding(draft);
       setStep(0);
       setDraft(EMPTY_DRAFT);
+      setLocationSuccess(null);
+      setLocationError(null);
     } finally {
       setSubmitting(false);
     }
@@ -282,14 +346,60 @@ export function OnboardingFlow({ open }: { open: boolean }) {
             }}
             className="flex flex-col gap-4"
           >
+            {/* Live Location Action Banner */}
+            <div className="rounded-lg border border-forest/20 bg-gradient-to-r from-forest/5 via-cream/60 to-gold/10 p-3.5 shadow-sm">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-2.5">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-forest text-cream shadow-xs">
+                    <LocateFixed className="h-4 w-4" aria-hidden />
+                  </span>
+                  <div>
+                    <p className="font-display text-[13px] font-bold text-forest-deep">
+                      Live Location · Browser GPS
+                    </p>
+                    <p className="text-[11.5px] leading-tight text-muted">
+                      Use Browser Geolocation API to auto-fill GPS coordinates and regional context
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={handleDetectLocation}
+                  loading={locating}
+                  className="shrink-0 font-semibold"
+                >
+                  <Compass className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                  {locating ? "Acquiring GPS..." : "Detect Live Location"}
+                </Button>
+              </div>
+
+              {locationSuccess && (
+                <div className="mt-2.5 flex items-center gap-2 rounded border border-forest/30 bg-[#edf5ea] px-3 py-1.5 text-[11.5px] font-medium text-forest-deep">
+                  <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-forest" aria-hidden />
+                  <span>{locationSuccess}</span>
+                </div>
+              )}
+
+              {locationError && (
+                <div className="mt-2.5 flex items-center gap-2 rounded border border-danger/30 bg-[#fdf1ee] px-3 py-1.5 text-[11.5px] text-[#8d3a26]">
+                  <TriangleAlert className="h-3.5 w-3.5 shrink-0 text-danger" aria-hidden />
+                  <span>{locationError}</span>
+                </div>
+              )}
+            </div>
+
             <TextField
               label="Farm name"
               required
               placeholder="e.g. Shanti Grove"
               value={draft.farmName}
               error={errors.farmName}
+              leadingIcon={<MapPin className="h-4 w-4" aria-hidden />}
               onChange={(e) => set("farmName", e.target.value)}
             />
+
             <div className="grid gap-4 sm:grid-cols-2">
               <SelectField
                 label="State"
@@ -308,6 +418,40 @@ export function OnboardingFlow({ open }: { open: boolean }) {
                 onChange={(e) => set("district", e.target.value)}
               />
             </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <TextField
+                label="Village / Taluka (optional)"
+                placeholder="e.g. Gokak Taluk"
+                value={draft.village || ""}
+                onChange={(e) => set("village", e.target.value)}
+              />
+              <TextField
+                label="PIN / Postal code (optional)"
+                placeholder="e.g. 591307"
+                maxLength={10}
+                value={draft.pincode || ""}
+                onChange={(e) => set("pincode", e.target.value)}
+              />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <SelectField
+                label="Soil type (optional)"
+                placeholder="Select soil classification"
+                value={draft.soilType || ""}
+                options={SOIL_TYPE_OPTIONS}
+                onChange={(e) => set("soilType", e.target.value)}
+              />
+              <SelectField
+                label="Primary irrigation source (optional)"
+                placeholder="Select irrigation method"
+                value={draft.irrigationSource || ""}
+                options={IRRIGATION_SOURCE_OPTIONS}
+                onChange={(e) => set("irrigationSource", e.target.value)}
+              />
+            </div>
+
             <div className="grid items-end gap-4 sm:grid-cols-[1fr_auto]">
               <TextField
                 label="Field size"
@@ -341,6 +485,43 @@ export function OnboardingFlow({ open }: { open: boolean }) {
                 </div>
               </div>
             </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <TextField
+                label="Latitude (optional)"
+                placeholder="e.g. 15.8497"
+                inputMode="decimal"
+                value={
+                  draft.latitude !== undefined && draft.latitude !== null
+                    ? String(draft.latitude)
+                    : ""
+                }
+                onChange={(e) =>
+                  set("latitude", e.target.value ? Number(e.target.value) : null)
+                }
+                hint="Auto-filled by live location or manual GPS."
+              />
+              <TextField
+                label="Longitude (optional)"
+                placeholder="e.g. 74.4977"
+                inputMode="decimal"
+                value={
+                  draft.longitude !== undefined && draft.longitude !== null
+                    ? String(draft.longitude)
+                    : ""
+                }
+                onChange={(e) =>
+                  set("longitude", e.target.value ? Number(e.target.value) : null)
+                }
+              />
+            </div>
+
+            <TextField
+              label="Notes / Field notes (optional)"
+              placeholder="Access roads, water channel maintenance, boundary notes…"
+              value={draft.notes || ""}
+              onChange={(e) => set("notes", e.target.value)}
+            />
           </form>
         )}
 
