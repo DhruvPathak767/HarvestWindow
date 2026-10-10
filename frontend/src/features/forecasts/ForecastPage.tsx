@@ -245,10 +245,19 @@ export default function ForecastPage() {
                         {formatDate(row.crop.plantingDate)}
                       </td>
                       <td className="px-4 py-3 text-[12.5px] font-semibold text-forest-deep">
-                        {formatDateRange(
-                          row.forecast.estimatedWindowStart,
-                          row.forecast.estimatedWindowEnd
-                        )}
+                        <div className="flex flex-col gap-0.5">
+                          <span>
+                            {formatDateRange(
+                              row.forecast.estimatedWindowStart,
+                              row.forecast.estimatedWindowEnd
+                            )}
+                          </span>
+                          {row.forecast.weatherAdjustmentApplied ? (
+                            <span className="inline-block w-fit rounded-full bg-gold/15 px-2 py-0.5 font-mono text-[10.5px] font-semibold text-[#8a6415]">
+                              Weather {row.forecast.weatherAdjustmentDays && row.forecast.weatherAdjustmentDays > 0 ? `+${row.forecast.weatherAdjustmentDays}d` : `${row.forecast.weatherAdjustmentDays}d`}
+                            </span>
+                          ) : null}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-[12.5px] text-muted">
                         {row.forecast.daysToWindowStart > 0

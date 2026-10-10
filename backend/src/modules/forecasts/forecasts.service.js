@@ -1,9 +1,60 @@
 import prisma from "../../config/prisma.js";
 import { AppError } from "../../middleware/errorHandler.js";
+import { getWeatherForFarm } from "../weather/weather.service.js";
+import { buildWeatherContext } from "./weatherContext.js";
 import { predictHarvestWindow } from "./predictionEngine.js";
 
 /**
+ * Helper to retrieve weather contexts for unique farms efficiently in batch.
+ * Guarantees that multiple crops on the same farm share a single weather context fetch.
+ *
+ * @param {string} userId - Authenticated user ID
+ * @param {Array<Object>} farms - List of unique farm objects { id, latitude, longitude }
+ * @param {Object} [options] - Options passed to getWeatherForFarm ({ forceRefresh })
+ * @returns {Promise<Map<string, Object>>} Map of farmId -> WeatherContext
+ */
+async function fetchWeatherContextsForFarms(userId, farms, options = {}) {
+  const contexts = new Map();
+  const uniqueFarmMap = new Map();
+
+  for (const f of farms) {
+    if (f && f.id && !uniqueFarmMap.has(f.id)) {
+      uniqueFarmMap.set(f.id, f);
+    }
+  }
+
+  await Promise.all(
+    Array.from(uniqueFarmMap.values()).map(async (farm) => {
+      const lat = farm.latitude !== null && farm.latitude !== undefined ? Number(farm.latitude) : null;
+      const lon = farm.longitude !== null && farm.longitude !== undefined ? Number(farm.longitude) : null;
+
+      if (lat === null || lon === null || Number.isNaN(lat) || Number.isNaN(lon)) {
+        contexts.set(farm.id, buildWeatherContext({ farm }));
+        return;
+      }
+
+      try {
+        const rawWeather = await getWeatherForFarm(userId, farm.id, options);
+        contexts.set(farm.id, buildWeatherContext(rawWeather));
+      } catch (err) {
+        // If weather provider fails or times out, gracefully construct fallback context preserving baseline
+        contexts.set(
+          farm.id,
+          buildWeatherContext({
+            farm,
+            error: err.message,
+          })
+        );
+      }
+    })
+  );
+
+  return contexts;
+}
+
+/**
  * Retrieves harvest window forecasts for all crops accessible to the user.
+ * Integrates validated Phase 4 weather contexts where available.
  *
  * @param {string} userId - ID of the authenticated user
  * @param {Object} [filters] - Optional query filters (farmId, cropId, readinessStatus, page, limit)
@@ -35,11 +86,17 @@ export async function getForecasts(userId, filters = {}) {
           name: true,
           state: true,
           district: true,
+          latitude: true,
+          longitude: true,
         },
       },
     },
     orderBy: { createdAt: "desc" },
   });
+
+  // Batch retrieve weather contexts for unique farms
+  const farmList = crops.map((c) => c.farm).filter(Boolean);
+  const weatherContexts = await fetchWeatherContextsForFarms(userId, farmList, { forceRefresh: false });
 
   const now = new Date();
   let forecasts = crops.map((crop) =>
@@ -52,6 +109,7 @@ export async function getForecasts(userId, filters = {}) {
           : null,
       },
       referenceDate: now,
+      weatherContext: crop.farmId ? weatherContexts.get(crop.farmId) : null,
     })
   );
 
@@ -77,7 +135,7 @@ export async function getForecasts(userId, filters = {}) {
 }
 
 /**
- * Retrieves a single harvest forecast by crop ID.
+ * Retrieves a single harvest forecast by crop ID with weather context.
  *
  * @param {string} userId
  * @param {string} cropId
@@ -98,6 +156,8 @@ export async function getForecastByCropId(userId, cropId) {
           name: true,
           state: true,
           district: true,
+          latitude: true,
+          longitude: true,
         },
       },
     },
@@ -105,6 +165,12 @@ export async function getForecastByCropId(userId, cropId) {
 
   if (!crop) {
     throw new AppError("Crop not found or you do not have permission to view it.", 404);
+  }
+
+  let weatherContext = null;
+  if (crop.farm) {
+    const contexts = await fetchWeatherContextsForFarms(userId, [crop.farm], { forceRefresh: false });
+    weatherContext = contexts.get(crop.farm.id) || null;
   }
 
   return predictHarvestWindow({
@@ -116,11 +182,13 @@ export async function getForecastByCropId(userId, cropId) {
         : null,
     },
     referenceDate: new Date(),
+    weatherContext,
   });
 }
 
 /**
  * Recalculates forecasts across an optional scope (crop, farm, or all accessible crops).
+ * Refreshes weather data from provider, re-evaluating baseline and weather adjustments from scratch.
  *
  * @param {string} userId - ID of the authenticated user
  * @param {Object} [scope] - Optional scope parameters { farmId, cropId }
@@ -177,11 +245,17 @@ export async function refreshForecasts(userId, scope = {}) {
           name: true,
           state: true,
           district: true,
+          latitude: true,
+          longitude: true,
         },
       },
     },
     orderBy: { createdAt: "desc" },
   });
+
+  // Force-refresh weather contexts for all unique farms in scope
+  const farmList = crops.map((c) => c.farm).filter(Boolean);
+  const weatherContexts = await fetchWeatherContextsForFarms(userId, farmList, { forceRefresh: true });
 
   const now = new Date();
   const refreshed = crops.map((crop) =>
@@ -194,6 +268,7 @@ export async function refreshForecasts(userId, scope = {}) {
           : null,
       },
       referenceDate: now,
+      weatherContext: crop.farmId ? weatherContexts.get(crop.farmId) : null,
     })
   );
 
