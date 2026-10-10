@@ -42,3 +42,10 @@ coverage/
 # Temporary files
 .temp/
 .tmp/
+
+# Python caches and artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+AI/harvest_prediction/artifacts/*.joblib

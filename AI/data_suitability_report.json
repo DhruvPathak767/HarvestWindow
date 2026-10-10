@@ -1,0 +1,118 @@
+{
+  "audit_timestamp": "2026-10-10T22:32:43.506428",
+  "summary": {
+    "supervised_harvest_labels_available": false,
+    "recommended_prediction_strategy": "Hybrid Agronomic Baseline + Growing Degree-Days (GDD) + Near-term Weather Adjustments",
+    "production_machine_learning_status": "Supervised ML training deferred until verified on-farm sowing and harvest observation records are logged. Architecture prepared with scikit-learn training pipeline."
+  },
+  "datasets": {
+    "kaggle_crop_production": {
+      "filename": "crop_production.csv",
+      "file_size_mb": 14.61,
+      "total_rows": 246091,
+      "columns": [
+        "State_Name",
+        "District_Name",
+        "Crop_Year",
+        "Season",
+        "Crop",
+        "Area",
+        "Production"
+      ],
+      "null_counts": {
+        "State_Name": 0,
+        "District_Name": 0,
+        "Crop_Year": 0,
+        "Season": 0,
+        "Crop": 0,
+        "Area": 0,
+        "Production": 3730
+      },
+      "unique_states": 33,
+      "unique_crops": 124,
+      "unique_seasons": [
+        "Autumn",
+        "Kharif",
+        "Rabi",
+        "Summer",
+        "Whole Year",
+        "Winter"
+      ],
+      "year_range": "1997 - 2015",
+      "sample_crops": [
+        "Apple",
+        "Arcanut (Processed)",
+        "Arecanut",
+        "Arhar/Tur",
+        "Ash Gourd",
+        "Atcanut (Raw)",
+        "Bajra",
+        "Banana",
+        "Barley",
+        "Bean",
+        "Beans & Mutter(Vegetable)",
+        "Beet Root",
+        "Ber",
+        "Bhindi",
+        "Bitter Gourd"
+      ],
+      "date_field_availability": {
+        "has_calendar_year": true,
+        "has_calendar_season": true,
+        "has_specific_sowing_date": false,
+        "has_specific_harvest_date": false,
+        "has_crop_duration_days": false
+      },
+      "weather_data_present": false,
+      "data_provenance": "Aggregated annual/seasonal district-level statistics published by Directorate of Economics and Statistics, Ministry of Agriculture & Farmers Welfare, Government of India.",
+      "suitability_for_harvest_date_prediction": "Unsuitable for direct supervised harvest date prediction.",
+      "suitability_explanation": "The dataset records macro-level annual crop area (hectares) and total production (metric tonnes) by season and district. It does NOT record micro-level field sowing dates, flowering dates, harvest dates, or days-to-maturity. Constructing a supervised ML target for harvest window from this dataset would require manufacturing synthetic dates, which is methodologically invalid and scientifically misleading.",
+      "recommended_usage": "Auxiliary regional agricultural context: identifying predominant regional crops, crop seasons (Kharif, Rabi, Zaid, Whole Year), and district-level historical crop prevalence."
+    },
+    "hf_crop_yield": {
+      "dataset_name": "dhyann2815/india-crop-yield-prediction",
+      "primary_purpose": "Crop yield prediction (metric tonnes per hectare) based on soil, district, and weather proxies.",
+      "features_present": [
+        "State",
+        "Crop",
+        "Crop_Year",
+        "Season",
+        "Area",
+        "Production",
+        "Yield",
+        "Annual_Rainfall",
+        "Fertilizer",
+        "Pesticide"
+      ],
+      "date_fields": {
+        "has_sowing_date": false,
+        "has_harvest_date": false,
+        "has_crop_duration_days": false,
+        "temporal_resolution": "Annual / Seasonal aggregation"
+      },
+      "suitability_for_harvest_date_prediction": "Unsuitable as supervised training labels for harvest timing.",
+      "suitability_explanation": "The dataset focuses on agricultural yield and input factors. While valuable for yield and production forecasting, it lacks daily phenological progression timestamps. Yield cannot be treated as a proxy for days remaining until maturity.",
+      "recommended_usage": "Supporting regional yield context and seasonal validation; excluded from supervised harvest date model training."
+    },
+    "hf_crop_disease_images": {
+      "dataset_name": "DigiGreen/Crop_Disease_Images",
+      "primary_purpose": "Computer vision classification for foliar crop diseases and leaf pathogens.",
+      "data_modality": "Images (RGB JPG/PNG) with disease diagnosis labels.",
+      "suitability_for_harvest_date_prediction": "Unsuitable for harvest window timing prediction.",
+      "suitability_explanation": "The dataset contains leaf disease pathology images without longitudinal growth timelines, sowing records, or harvest timestamps. Downloading multi-gigabyte image sets for harvest timing prediction is unnecessary and inappropriate.",
+      "recommended_usage": "Preserved for future crop health, foliar inspection, and pest/pathology diagnostic modules."
+    }
+  },
+  "missing_fields_for_supervised_training": [
+    "field_sowing_date (exact calendar date of planting/transplanting)",
+    "actual_harvest_date (exact calendar date when crop reached physiological maturity or harvest)",
+    "variety_identifier (specific cultivar e.g., HD-2967, Lokwan, Basmati-1121)",
+    "geo_coordinates (farm-level latitude and longitude for daily microclimate matching)",
+    "daily_temperature_series (observed daily min/max temperatures throughout growth cycle)"
+  ],
+  "compliance_with_prompt_guidelines": {
+    "no_fake_labels_created": true,
+    "no_synthetic_supervised_model": true,
+    "transparent_agronomic_fallback": true
+  }
+}

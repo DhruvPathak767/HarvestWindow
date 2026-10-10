@@ -1,0 +1,12 @@
+{
+  "status": "pending_labeled_data",
+  "reason": "Available datasets lack actual sowing and harvest date observation pairs",
+  "required_fields": [
+    "crop_name",
+    "sowing_date",
+    "actual_harvest_date",
+    "farm_coordinates"
+  ],
+  "production_fallback": "Layer A (Agronomic Baseline) + Layer B (GDD Accumulation) + Layer C (Weather)",
+  "updated_at": "2026-10-10T17:12:02.435983Z"
+}

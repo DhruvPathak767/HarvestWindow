@@ -135,6 +135,31 @@ export interface Forecast {
   calculatedAt?: string;
   sourceType: ForecastSourceType;
   modelNote: string;
+  predictionMethod?: string;
+  modelVersion?: string;
+  gddMetrics?: {
+    baseTemperatureC: number;
+    upperThresholdC?: number | null;
+    accumulatedGdd: number;
+    requiredMaturityGdd: number;
+    progressPercentage: number;
+    gddMaturityEstimatedDate?: string | null;
+  } | null;
+  dataQuality?: {
+    cropProfileAvailable: boolean;
+    sowingDateAvailable: boolean;
+    weatherDataAvailable: boolean;
+    verifiedGddAvailable: boolean;
+    historicalObservationsCount?: number;
+    forecastDaysIncluded?: number;
+    missingWeatherDays?: number;
+  } | null;
+  explanationFactors?: Array<{
+    factor: string;
+    impact: string;
+    description: string;
+  }>;
+  isPastDue?: boolean;
 }
 
 export type WeatherCondition =

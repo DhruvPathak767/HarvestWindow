@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import {
@@ -6,13 +6,18 @@ import {
   CalendarRange,
   CheckCircle2,
   CloudRain,
+  Cpu,
+  Flame,
   Gauge,
+  History,
   Info,
   Leaf,
   ListChecks,
   MapPin,
   Pencil,
   RefreshCw,
+  ShieldCheck,
+  Sparkles,
   Sprout,
   Trash2,
 } from "lucide-react";
@@ -30,6 +35,8 @@ import { EditCropModal } from "./EditCropModal";
 import { weatherService, CONDITION_LABEL } from "@/services/weather/weatherService";
 import { daysLabel, formatDate, formatTime, relativeTime } from "@/utils/date";
 import { cn } from "@/utils/cn";
+import { api } from "@/services/api";
+import { useToast } from "@/components/feedback/ToastProvider";
 
 export default function CropDetailPage() {
   const { cropId } = useParams<{ cropId: string }>();
@@ -46,11 +53,72 @@ export default function CropDetailPage() {
     refreshForecasts,
     refreshingForecasts,
   } = useStore();
+  const { toast } = useToast();
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [aiPredicting, setAiPredicting] = useState(false);
+  const [liveAiPrediction, setLiveAiPrediction] = useState<any>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyList, setHistoryList] = useState<any[]>([]);
 
   const crop = crops.find((c) => c.id === cropId) ?? null;
+
+  useEffect(() => {
+    if (cropId) {
+      void api.getPredictionHistory(cropId).then((records) => {
+        if (Array.isArray(records) && records.length > 0) {
+          setHistoryList(records);
+        }
+      }).catch(() => {});
+    }
+  }, [cropId]);
+
+  const handleRunAiPrediction = async () => {
+    if (!crop) return;
+    setAiPredicting(true);
+    try {
+      const res = await api.predictHarvest({
+        cropId: crop.id,
+        farmId: crop.farmId,
+        sowingDate: crop.plantingDate,
+        observedGrowthStage: crop.growthStage,
+      });
+
+      if (res && res.status === "success" && res.prediction) {
+        setLiveAiPrediction(res.prediction);
+        toast({
+          tone: "success",
+          title: "AI Harvest Prediction Updated",
+          description: `Most likely harvest: ${res.prediction.most_likely_harvest_date} (${res.prediction.prediction_method})`,
+        });
+        void refreshForecasts(crop.name, crop.farmId, crop.id);
+        const updatedHistory = await api.getPredictionHistory(crop.id);
+        if (Array.isArray(updatedHistory)) setHistoryList(updatedHistory);
+      } else if (res && res.status === "insufficient_data") {
+        toast({
+          tone: "caution",
+          title: "Insufficient Data for Prediction",
+          description: res.message || "Please provide required crop parameters.",
+        });
+      } else {
+        toast({
+          tone: "caution",
+          title: "Prediction Completed via Fallback",
+          description: res?.message || "Agronomic baseline was computed.",
+        });
+      }
+    } catch (err: any) {
+      toast({
+        tone: "error",
+        title: "Prediction Failed",
+        description: err?.message || "Failed to contact prediction engine.",
+      });
+    } finally {
+      setAiPredicting(false);
+    }
+  };
 
   if (!crop) {
     return (
@@ -135,6 +203,25 @@ export default function CropDetailPage() {
         actions={
           <>
             <StatusBadge status={forecast.readinessStatus} full />
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={handleRunAiPrediction}
+              loading={aiPredicting}
+              aria-label={`Run AI harvest prediction for ${crop.name}`}
+            >
+              <Sparkles className="h-3.5 w-3.5 text-gold" aria-hidden />
+              AI Recalculate
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={handleOpenHistory}
+              aria-label="View prediction history"
+            >
+              <History className="h-3.5 w-3.5" aria-hidden />
+              History{historyList.length > 0 ? ` (${historyList.length})` : ""}
+            </Button>
             <Button
               size="sm"
               variant="secondary"
@@ -235,6 +322,119 @@ export default function CropDetailPage() {
           <div className="p-6">
             <HarvestTimeline forecast={forecast} crop={crop} farmName={farm?.name} detailed />
 
+            {/* Phase AI-2 Prediction Engine Details */}
+            <div className="mt-6 rounded-lg border border-gold/30 bg-gradient-to-br from-cream/90 to-soft/40 p-5 shadow-xs">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line/60 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-md bg-forest-deep text-cream">
+                    <Sparkles className="h-4 w-4 text-gold" aria-hidden />
+                  </span>
+                  <div>
+                    <h3 className="font-display text-[14px] font-bold text-forest-deep">
+                      Harvest Window Prediction Engine
+                    </h3>
+                    <p className="font-mono text-[11px] text-muted">
+                      {liveAiPrediction?.model_version || "Phase AI-2 Hybrid Engine · v2.0.0"}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-forest/20 bg-forest/10 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-forest-deep">
+                    <ShieldCheck className="h-3 w-3 text-living" aria-hidden />
+                    {liveAiPrediction?.prediction_method === "agronomic_gdd_weather"
+                      ? "Agronomic Baseline + GDD & Weather"
+                      : liveAiPrediction?.prediction_method === "supervised_ml"
+                        ? "Supervised ML"
+                        : "ICAR Agronomic Baseline"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Key AI Windows */}
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-md border border-line bg-white p-3">
+                  <p className="hw-eyebrow text-[10px] text-muted uppercase">Earliest Harvest</p>
+                  <p className="mt-1 font-mono text-[13.5px] font-bold text-forest-deep">
+                    {formatDate(liveAiPrediction?.estimated_harvest_start || forecast.estimatedWindowStart)}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-muted">Window opening date</p>
+                </div>
+                <div className="rounded-md border border-gold/40 bg-gold/10 p-3">
+                  <p className="hw-eyebrow text-[10px] font-bold text-[#8a6415] uppercase">Most Likely Date</p>
+                  <p className="mt-1 font-mono text-[14px] font-black text-forest-deep">
+                    {formatDate(liveAiPrediction?.most_likely_harvest_date || forecast.harvestWindow?.typicalDate || forecast.estimatedWindowStart)}
+                  </p>
+                  <p className="mt-0.5 text-[11px] font-medium text-[#8a6415]">Optimal physiological maturity</p>
+                </div>
+                <div className="rounded-md border border-line bg-white p-3">
+                  <p className="hw-eyebrow text-[10px] text-muted uppercase">Latest Safe Harvest</p>
+                  <p className="mt-1 font-mono text-[13.5px] font-bold text-forest-deep">
+                    {formatDate(liveAiPrediction?.estimated_harvest_end || forecast.estimatedWindowEnd)}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-muted">Pre-lodging/shattering bound</p>
+                </div>
+              </div>
+
+              {/* GDD Phenology Progress Bar if available */}
+              {(liveAiPrediction?.gdd_metrics || historyList[0]?.gddMetrics) && (() => {
+                const gdd = liveAiPrediction?.gdd_metrics || historyList[0]?.gddMetrics;
+                const progress = Math.min(100, Math.round(gdd.progress_percentage || gdd.progressPct || 0));
+                return (
+                  <div className="mt-4 rounded-md border border-line bg-white p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="flex items-center gap-1.5 text-[12.5px] font-bold text-forest-deep">
+                        <Flame className="h-3.5 w-3.5 text-gold" aria-hidden />
+                        Growing Degree-Day (GDD) Accumulation
+                      </p>
+                      <span className="font-mono text-[12px] font-semibold text-forest">
+                        {gdd.accumulated_gdd || gdd.accumulatedGdd} / {gdd.required_maturity_gdd || gdd.requiredGdd} GDD ({progress}%)
+                      </span>
+                    </div>
+                    <div className="mt-2.5 h-2 w-full overflow-hidden rounded-full bg-soft">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-forest via-gold to-living transition-all duration-500"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center justify-between text-[11px] text-muted">
+                      <span>Base temp T_base = {gdd.base_temperature_c || gdd.baseTemperatureC}°C</span>
+                      {gdd.gdd_maturity_estimated_date && (
+                        <span>Thermal maturity projected: {formatDate(gdd.gdd_maturity_estimated_date)}</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Explanatory Factors */}
+              {liveAiPrediction?.explanation && liveAiPrediction.explanation.length > 0 && (
+                <div className="mt-4">
+                  <p className="hw-eyebrow text-[11px] font-bold text-forest-deep uppercase">
+                    Agronomic & Environmental Factors
+                  </p>
+                  <ul className="mt-2 flex flex-col gap-1.5">
+                    {liveAiPrediction.explanation.map((fac: any, idx: number) => (
+                      <li key={idx} className="flex items-start gap-2 rounded-md bg-white/80 px-3 py-2 text-[12px] text-forest-deep border border-line/60">
+                        <span className={cn(
+                          "mt-1 h-1.5 w-1.5 shrink-0 rounded-full",
+                          fac.impact === "delay" ? "bg-info" : fac.impact === "accelerate" ? "bg-gold" : "bg-living"
+                        )} />
+                        <span>{fac.description}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Honest Methodology Notice */}
+              <div className="mt-4 flex items-start gap-2 rounded-md bg-cream/90 p-3 text-[11.5px] text-muted border border-line/70">
+                <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-forest" aria-hidden />
+                <p>
+                  <span className="font-semibold text-forest-deep">Honest ML Disclosure:</span> Grounded in ICAR/SAU verified developmental benchmarks and Open-Meteo microclimate observations. Production supervised ML inference is held in reserve until actual verified farm harvest date observation pairs are logged to maintain zero false accuracy.
+                </p>
+              </div>
+            </div>
+
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               <div className="rounded-md border border-line bg-cream/70 p-4">
                 <p className="hw-eyebrow font-semibold text-living">Recommended next action</p>
@@ -257,10 +457,10 @@ export default function CropDetailPage() {
                   )}
                 </div>
                 <p className="mt-2 text-[13.5px] leading-relaxed text-forest-deep">
-                  {forecast.weatherNote || "Phase 5 baseline calculation active."}
+                  {forecast.weatherNote || "Phase AI-2 hybrid model active."}
                 </p>
                 <p className="mt-2 font-mono text-[10.5px] tracking-wide text-muted uppercase">
-                  {farmWeather?.sourceLabel ?? "Phase 4 Weather Provider"}
+                  {farmWeather?.sourceLabel ?? "Open-Meteo & Weather Provider"}
                   {forecast.weatherDataTimestamp ? ` · synced ${relativeTime(forecast.weatherDataTimestamp)}` : ""}
                 </p>
               </div>
@@ -530,6 +730,76 @@ export default function CropDetailPage() {
         onClose={() => setEditOpen(false)}
         crop={crop}
       />
+
+      <Modal
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        title={`Prediction History · ${crop.name}`}
+        description="Audit log of previous harvest window predictions saved in the database."
+        size="lg"
+      >
+        <div className="flex flex-col gap-4">
+          {historyLoading ? (
+            <p className="py-6 text-center text-[13px] text-muted">Loading prediction audit records...</p>
+          ) : historyList.length > 0 ? (
+            <div className="hw-scroll-x overflow-x-auto">
+              <table className="w-full min-w-[620px] border-collapse text-left text-[12.5px]">
+                <thead>
+                  <tr className="border-b border-line bg-cream/70 text-[11px] font-semibold text-muted uppercase">
+                    <th className="px-3 py-2">Computed</th>
+                    <th className="px-3 py-2">Method</th>
+                    <th className="px-3 py-2">Optimal Date</th>
+                    <th className="px-3 py-2">Window Range</th>
+                    <th className="px-3 py-2">Thermal GDD</th>
+                    <th className="px-3 py-2">Weather Adj</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {historyList.map((rec) => (
+                    <tr key={rec.id} className="border-b border-line/60 last:border-0 hover:bg-soft/40">
+                      <td className="px-3 py-2.5 font-mono text-[11.5px] text-muted">
+                        {formatDate(rec.predictionDate)}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <span className="rounded-full bg-forest/10 px-2 py-0.5 text-[11px] font-semibold text-forest-deep">
+                          {rec.predictionMethod === "agronomic_gdd_weather"
+                            ? "GDD + Weather"
+                            : rec.predictionMethod === "agronomic_baseline"
+                              ? "Agronomic Baseline"
+                              : rec.predictionMethod}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 font-mono font-bold text-forest-deep">
+                        {formatDate(rec.mostLikelyHarvestDate)}
+                      </td>
+                      <td className="px-3 py-2.5 text-muted">
+                        {formatDate(rec.estimatedHarvestStart)} → {formatDate(rec.estimatedHarvestEnd)}
+                      </td>
+                      <td className="px-3 py-2.5 font-mono text-muted">
+                        {rec.gddMetrics ? `${rec.gddMetrics.accumulatedGdd} / ${rec.gddMetrics.requiredGdd} GDD` : "—"}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        {rec.weatherAdjustmentDays !== 0 ? (
+                          <span className="rounded-md bg-gold/20 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-[#8a6415]">
+                            {rec.weatherAdjustmentDays > 0 ? `+${rec.weatherAdjustmentDays}d` : `${rec.weatherAdjustmentDays}d`}
+                          </span>
+                        ) : (
+                          <span className="text-muted">0d</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="py-6 text-center text-muted">
+              <p className="text-[13px]">No saved prediction records found for this crop yet.</p>
+              <p className="mt-1 text-[12px]">Click &quot;AI Recalculate&quot; above to compute and persist the first forecast.</p>
+            </div>
+          )}
+        </div>
+      </Modal>
     </div>
   );
 }
