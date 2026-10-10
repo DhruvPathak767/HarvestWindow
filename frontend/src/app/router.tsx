@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { AppShell } from "@/components/layout/AppShell";
 import { Logo } from "@/components/brand/Logo";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import LandingPage from "@/features/landing/LandingPage";
 import SignIn from "@/features/auth/SignIn";
 import SignUp from "@/features/auth/SignUp";
@@ -44,39 +45,41 @@ export function AppRoutes() {
   const reduced = useReducedMotion();
 
   return (
-    <Suspense fallback={<RouteFallback />}>
-      <Routes location={location}>
-        {/* Route-level transitions are handled inside <AppShell/> so the shell,
-            sidebar and scroll position are preserved between /app routes. */}
-          <Route path="/" element={<LandingPage />} />
-          <Route
-            path="/how-it-works"
-            element={
-              <motion.div
-                initial={reduced ? false : { opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.3 }}
-              >
-                <HowItWorksPage />
-              </motion.div>
-            }
-          />
-          <Route path="/sign-in" element={<SignIn />} />
-          <Route path="/sign-up" element={<SignUp />} />
+    <ErrorBoundary fallbackTitle="Application encountered an unexpected error">
+      <Suspense fallback={<RouteFallback />}>
+        <Routes location={location}>
+          {/* Route-level transitions are handled inside <AppShell/> so the shell,
+              sidebar and scroll position are preserved between /app routes. */}
+            <Route path="/" element={<LandingPage />} />
+            <Route
+              path="/how-it-works"
+              element={
+                <motion.div
+                  initial={reduced ? false : { opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <HowItWorksPage />
+                </motion.div>
+              }
+            />
+            <Route path="/sign-in" element={<SignIn />} />
+            <Route path="/sign-up" element={<SignUp />} />
 
-          <Route path="/app" element={<AppShell />}>
-            <Route index element={<DashboardPage />} />
-            <Route path="farms" element={<FarmsPage />} />
-            <Route path="farms/:farmId" element={<FarmDetailPage />} />
-            <Route path="crops/:cropId" element={<CropDetailPage />} />
-            <Route path="forecast" element={<ForecastPage />} />
-            <Route path="weather" element={<WeatherPage />} />
-            <Route path="recommendations" element={<RecommendationsPage />} />
-            <Route path="settings" element={<SettingsPage />} />
-          </Route>
+            <Route path="/app" element={<AppShell />}>
+              <Route index element={<DashboardPage />} />
+              <Route path="farms" element={<FarmsPage />} />
+              <Route path="farms/:farmId" element={<FarmDetailPage />} />
+              <Route path="crops/:cropId" element={<CropDetailPage />} />
+              <Route path="forecast" element={<ForecastPage />} />
+              <Route path="weather" element={<WeatherPage />} />
+              <Route path="recommendations" element={<RecommendationsPage />} />
+              <Route path="settings" element={<SettingsPage />} />
+            </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Suspense>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
+    </ErrorBoundary>
   );
 }

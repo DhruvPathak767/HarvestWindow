@@ -40,6 +40,7 @@ import { DEFAULT_SETTINGS, DEMO_CREDENTIALS, DEMO_USER } from "@/data/mock/seed"
 import { setLocale } from "@/utils/date";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { authClient, type AuthUser } from "@/services/api/authClient";
+import { openMeteoWeatherProvider } from "@/services/weather/openMeteoProvider";
 
 export const ALL_FARMS = "all" as const;
 export type FarmSelection = string | typeof ALL_FARMS;
@@ -90,6 +91,7 @@ interface StoreValue {
   activity: ActivityEvent[];
   settings: AppSettings;
   weather: Record<string, WeatherSummary>;
+  weatherLoading: boolean;
   forecasts: Record<string, Forecast>;
   notifications: AppNotification[];
   unreadCount: number;
@@ -123,6 +125,7 @@ interface StoreValue {
   updateSettings: (patch: Partial<AppSettings>) => Promise<void>;
   updateProfile: (patch: Partial<UserProfile>) => Promise<void>;
   refreshForecasts: (scope?: string) => void;
+  fetchFarmWeather: (farmId: string, forceRefresh?: boolean) => Promise<WeatherSummary | null>;
   resetDemoData: () => Promise<void>;
   markNotificationsRead: () => void;
 }
@@ -216,16 +219,23 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const [liveWeather, setLiveWeather] = useState<Record<string, WeatherSummary>>({});
+  const [weatherLoading, setWeatherLoading] = useState(false);
+
   const intelligence = useMemo(
     () => buildIntelligence(snapshot.farms, snapshot.crops),
     [snapshot.farms, snapshot.crops]
   );
 
+  const mergedWeather = useMemo(() => {
+    return { ...intelligence.weather, ...liveWeather };
+  }, [intelligence.weather, liveWeather]);
+
   const notifications = useMemo<AppNotification[]>(() => {
     const out: AppNotification[] = [];
 
     for (const farm of snapshot.farms) {
-      const weather = intelligence.weather[farm.id];
+      const weather = mergedWeather[farm.id];
       if (!weather) continue;
       for (const caution of weather.cautions) {
         out.push({
@@ -809,6 +819,45 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     });
   }, [snapshot.onboarded, toast]);
 
+  const fetchFarmWeather = useCallback<StoreValue["fetchFarmWeather"]>(
+    async (farmId, forceRefresh = false) => {
+      const farm = snapshot.farms.find((f) => f.id === farmId);
+      if (!farm) return null;
+      setWeatherLoading(true);
+      try {
+        const summary = await openMeteoWeatherProvider.fetchForFarm(farm, forceRefresh);
+        setLiveWeather((prev) => ({ ...prev, [farmId]: summary }));
+        return summary;
+      } catch (err) {
+        console.warn(`[AppStore] fetchFarmWeather failed for ${farmId}:`, err);
+        return null;
+      } finally {
+        setWeatherLoading(false);
+      }
+    },
+    [snapshot.farms]
+  );
+
+  useEffect(() => {
+    if (ready && snapshot.signedIn && snapshot.farms.length > 0) {
+      const targetId =
+        selectedFarmId && selectedFarmId !== ALL_FARMS
+          ? selectedFarmId
+          : snapshot.farms[0]?.id;
+      const targetFarm = snapshot.farms.find((f) => f.id === targetId);
+      if (
+        targetFarm &&
+        targetFarm.latitude !== null &&
+        targetFarm.longitude !== null &&
+        targetFarm.latitude !== undefined &&
+        targetFarm.longitude !== undefined &&
+        !liveWeather[targetFarm.id]
+      ) {
+        void fetchFarmWeather(targetFarm.id);
+      }
+    }
+  }, [ready, snapshot.signedIn, selectedFarmId, snapshot.farms, liveWeather, fetchFarmWeather]);
+
   const markNotificationsRead = useCallback(() => {
     setReadNotificationIds(notifications.map((n) => n.id));
   }, [notifications]);
@@ -828,7 +877,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       recommendations: snapshot.recommendations,
       activity: snapshot.activity,
       settings: snapshot.settings,
-      weather: intelligence.weather,
+      weather: mergedWeather,
+      weatherLoading,
       forecasts: intelligence.forecasts,
       notifications,
       unreadCount,
@@ -854,6 +904,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       updateSettings,
       updateProfile,
       refreshForecasts,
+      fetchFarmWeather,
       resetDemoData,
       markNotificationsRead,
     }),
@@ -863,6 +914,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       load,
       snapshot,
       showOnboarding,
+      mergedWeather,
+      weatherLoading,
       intelligence,
       notifications,
       unreadCount,
@@ -886,6 +939,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       setRecommendationStatus,
       updateSettings,
       refreshForecasts,
+      fetchFarmWeather,
       resetDemoData,
       markNotificationsRead,
       updateProfile,

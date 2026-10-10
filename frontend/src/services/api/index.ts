@@ -651,6 +651,23 @@ export const api: HarvestWindowApi = {
     localStore.clear();
     return buildSeedSnapshot();
   },
+
+  async getFarmWeather(farmId: string, refresh = false) {
+    const query = refresh ? "?refresh=true" : "";
+    const res = await apiRequest<{
+      success: boolean;
+      data: any;
+    }>(`/weather/${farmId}${query}`);
+    return res.data;
+  },
+
+  async getCurrentLocationWeather(latitude: number, longitude: number) {
+    const res = await apiRequest<{
+      success: boolean;
+      data: any;
+    }>(`/weather/current?latitude=${latitude}&longitude=${longitude}`);
+    return res.data;
+  },
 };
 
 /**

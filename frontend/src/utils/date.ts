@@ -66,13 +66,18 @@ export function getLocale(): string {
 function makeFormatter(key: string, options: Intl.DateTimeFormatOptions) {
   return {
     format(value: Date): string {
+      if (!value || isNaN(value.getTime())) return "—";
       const cacheKey = `${currentLocale}:${key}`;
       let formatter = formatterCache.get(cacheKey);
       if (!formatter) {
         formatter = new Intl.DateTimeFormat(currentLocale, options);
         formatterCache.set(cacheKey, formatter);
       }
-      return formatter.format(value);
+      try {
+        return formatter.format(value);
+      } catch {
+        return "—";
+      }
     },
   };
 }
@@ -94,25 +99,36 @@ const monthFmt = makeFormatter("month", { month: "short" });
 
 export function formatDate(value?: string | Date | null): string {
   if (!value) return "—";
-  return dateFmt.format(toDate(value));
+  const d = toDate(value);
+  if (isNaN(d.getTime())) return "—";
+  return dateFmt.format(d);
 }
 
 export function formatShortDate(value?: string | Date | null): string {
   if (!value) return "—";
-  return shortDateFmt.format(toDate(value));
+  const d = toDate(value);
+  if (isNaN(d.getTime())) return "—";
+  return shortDateFmt.format(d);
 }
 
-export function formatWeekday(value: string | Date): string {
-  return weekdayFmt.format(toDate(value));
+export function formatWeekday(value?: string | Date | null): string {
+  if (!value) return "—";
+  const d = toDate(value);
+  if (isNaN(d.getTime())) return "—";
+  return weekdayFmt.format(d);
 }
 
-export function formatMonth(value: string | Date): string {
-  return monthFmt.format(toDate(value));
+export function formatMonth(value?: string | Date | null): string {
+  if (!value) return "—";
+  const d = toDate(value);
+  if (isNaN(d.getTime())) return "—";
+  return monthFmt.format(d);
 }
 
 export function formatDateRange(start: string, end: string): string {
   const s = toDate(start);
   const e = toDate(end);
+  if (isNaN(s.getTime()) || isNaN(e.getTime())) return "—";
   if (s.getMonth() === e.getMonth() && s.getFullYear() === e.getFullYear()) {
     return `${s.getDate()}–${dateFmt.format(e)}`;
   }
@@ -124,13 +140,18 @@ const timeFmt = makeFormatter("time", {
   minute: "2-digit",
 });
 
-export function formatTime(value: string | Date): string {
-  return timeFmt.format(toDate(value));
+export function formatTime(value?: string | Date | null): string {
+  if (!value) return "—";
+  const d = toDate(value);
+  if (isNaN(d.getTime())) return "—";
+  return timeFmt.format(d);
 }
 
-export function relativeTime(value: string | Date): string {
-  const then = toDate(value).getTime();
-  const diff = Date.now() - then;
+export function relativeTime(value?: string | Date | null): string {
+  if (!value) return "just now";
+  const d = toDate(value);
+  if (isNaN(d.getTime())) return "just now";
+  const diff = Date.now() - d.getTime();
   const mins = Math.round(diff / 60_000);
   if (mins < 1) return "just now";
   if (mins < 60) return `${mins} min ago`;
