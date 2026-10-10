@@ -496,7 +496,7 @@ export const SEED_ACTIVITY: ActivityEvent[] = [
 
 export const DEFAULT_SETTINGS: AppSettings = {
   areaUnit: "hectare",
-  defaultFarmId: "farm-greenridge",
+  defaultFarmId: null,
   language: "en",
   temperatureUnit: "c",
   compactDensity: false,

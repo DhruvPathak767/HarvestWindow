@@ -80,12 +80,51 @@ export interface GrowthStagePoint {
 export interface Forecast {
   id: string;
   cropId: string;
+  cropName?: string;
+  variety?: string | null;
+  farmId?: string;
   estimatedWindowStart: string;
   estimatedWindowEnd: string;
+  harvestWindow?: {
+    startDate: string | null;
+    typicalDate: string | null;
+    endDate: string | null;
+  };
+  baselineHarvestWindow?: {
+    startDate: string | null;
+    typicalDate: string | null;
+    endDate: string | null;
+  };
+  adjustedHarvestWindow?: {
+    startDate: string | null;
+    typicalDate: string | null;
+    endDate: string | null;
+  } | null;
+  weatherAdjustmentApplied?: boolean;
+  weatherAdjustmentStatus?: "APPLIED" | "NOT_APPLIED" | "UNAVAILABLE";
+  weatherAdjustmentDays?: number;
+  weatherFactors?: ContributingFactor[];
+  weatherDataTimestamp?: string | null;
+  forecastCalculationTimestamp?: string;
+  weatherContextSummary?: {
+    totalRainfallMm?: number;
+    maxDailyRainfallMm?: number;
+    peakMaxTempC?: number | null;
+    lowestMinTempC?: number | null;
+    heatwaveDaysCount?: number;
+    frostRiskDaysCount?: number;
+    isStale?: boolean;
+    provider?: string;
+  } | null;
   readinessStatus: ReadinessStatus;
+  readinessLevel?: string;
+  daysUntilHarvest?: number;
   /** Optional by contract: completeness of inputs, not measured model accuracy. */
   confidence?: number;
+  confidenceScore?: number;
+  confidenceDetails?: { score: number; level: string; interpretation?: string };
   contributingFactors: ContributingFactor[];
+  growthTimeline?: GrowthStagePoint[];
   stagePlan: GrowthStagePoint[];
   seasonProgress: number;
   daysToWindowStart: number;
@@ -93,6 +132,7 @@ export interface Forecast {
   weatherNote?: string;
   nextAction: string;
   updatedAt: string;
+  calculatedAt?: string;
   sourceType: ForecastSourceType;
   modelNote: string;
 }

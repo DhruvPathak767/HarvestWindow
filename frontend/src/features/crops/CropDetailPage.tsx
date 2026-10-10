@@ -12,6 +12,7 @@ import {
   ListChecks,
   MapPin,
   Pencil,
+  RefreshCw,
   Sprout,
   Trash2,
 } from "lucide-react";
@@ -42,6 +43,8 @@ export default function CropDetailPage() {
     recommendations,
     removeCrop,
     setRecommendationStatus,
+    refreshForecasts,
+    refreshingForecasts,
   } = useStore();
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -135,6 +138,16 @@ export default function CropDetailPage() {
             <Button
               size="sm"
               variant="secondary"
+              onClick={() => void refreshForecasts(crop.name, crop.farmId, crop.id)}
+              loading={refreshingForecasts}
+              aria-label={`Refresh prediction for ${crop.name}`}
+            >
+              <RefreshCw className="h-3.5 w-3.5" aria-hidden />
+              Refresh
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
               onClick={() => setEditOpen(true)}
               aria-label={`Edit ${crop.name} details`}
             >
@@ -167,7 +180,22 @@ export default function CropDetailPage() {
               aria-hidden
             />
             <div className="relative">
-              <p className="hw-eyebrow font-semibold text-gold">Estimated harvest window</p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="hw-eyebrow font-semibold text-gold">Estimated harvest window</p>
+                {forecast.weatherAdjustmentStatus === "APPLIED" ? (
+                  <span className="rounded-full border border-gold/40 bg-gold/20 px-2.5 py-0.5 text-[11px] font-semibold text-gold">
+                    Weather-adjusted ({forecast.weatherAdjustmentDays && forecast.weatherAdjustmentDays > 0 ? `+${forecast.weatherAdjustmentDays}d` : `${forecast.weatherAdjustmentDays}d`})
+                  </span>
+                ) : forecast.weatherAdjustmentStatus === "NOT_APPLIED" ? (
+                  <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-[11px] font-medium text-cream/80">
+                    Baseline duration · Weather normal
+                  </span>
+                ) : (
+                  <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-[11px] font-medium text-cream/70">
+                    Baseline estimate · Weather unavailable
+                  </span>
+                )}
+              </div>
               <motion.p
                 initial={reduced ? false : { opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -178,6 +206,11 @@ export default function CropDetailPage() {
                 <span className="mx-2.5 text-[22px] font-semibold text-sage">→</span>
                 {formatDate(forecast.estimatedWindowEnd)}
               </motion.p>
+              {forecast.baselineHarvestWindow?.startDate && forecast.weatherAdjustmentApplied && (
+                <p className="mt-2 font-mono text-[12px] text-sage/90">
+                  Agronomic baseline: {formatDate(forecast.baselineHarvestWindow.startDate)} → {formatDate(forecast.baselineHarvestWindow.endDate)}
+                </p>
+              )}
               <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-sage/85">
                 <span className="inline-flex items-center gap-1.5">
                   <CalendarRange className="h-3.5 w-3.5 text-gold" aria-hidden />
@@ -215,12 +248,20 @@ export default function CropDetailPage() {
                 )}
               </div>
               <div className="rounded-md border border-line bg-cream/70 p-4">
-                <p className="hw-eyebrow font-semibold text-info">Weather note</p>
+                <div className="flex items-center justify-between">
+                  <p className="hw-eyebrow font-semibold text-info">Weather model integration</p>
+                  {forecast.weatherAdjustmentStatus && (
+                    <span className="font-mono text-[10px] font-bold tracking-wider text-muted uppercase">
+                      {forecast.weatherAdjustmentStatus}
+                    </span>
+                  )}
+                </div>
                 <p className="mt-2 text-[13.5px] leading-relaxed text-forest-deep">
-                  {forecast.weatherNote}
+                  {forecast.weatherNote || "Phase 5 baseline calculation active."}
                 </p>
                 <p className="mt-2 font-mono text-[10.5px] tracking-wide text-muted uppercase">
-                  {farmWeather?.sourceLabel ?? "No weather dataset attached"}
+                  {farmWeather?.sourceLabel ?? "Phase 4 Weather Provider"}
+                  {forecast.weatherDataTimestamp ? ` · synced ${relativeTime(forecast.weatherDataTimestamp)}` : ""}
                 </p>
               </div>
             </div>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowUpRight,
@@ -24,14 +24,38 @@ type StatusFilter = "all" | ReadinessStatus;
 
 export default function ForecastPage() {
   const navigate = useNavigate();
-  const { farms, crops, forecasts, selectedFarmId, selectFarm, refreshForecasts } = useStore();
+  const {
+    farms,
+    crops,
+    forecasts,
+    selectedFarmId,
+    selectFarm,
+    refreshForecasts,
+    refreshingForecasts,
+  } = useStore();
   const [view, setView] = useState<ViewMode>("timeline");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [farmFilter, setFarmFilter] = useState<string>(selectedFarmId);
 
+  // Sync farmFilter whenever selectedFarmId or farms change
+  useEffect(() => {
+    if (selectedFarmId === ALL_FARMS || farms.some((f) => f.id === selectedFarmId)) {
+      setFarmFilter(selectedFarmId);
+    } else {
+      setFarmFilter(ALL_FARMS);
+    }
+  }, [selectedFarmId, farms]);
+
+  // Defensive fallback: if farmFilter points to an unknown farm, treat as ALL_FARMS
+  const effectiveFarmFilter = useMemo(() => {
+    if (farmFilter === ALL_FARMS) return ALL_FARMS;
+    if (farms.some((f) => f.id === farmFilter)) return farmFilter;
+    return ALL_FARMS;
+  }, [farmFilter, farms]);
+
   const rows = useMemo(() => {
     const scoped =
-      farmFilter === ALL_FARMS ? crops : crops.filter((c) => c.farmId === farmFilter);
+      effectiveFarmFilter === ALL_FARMS ? crops : crops.filter((c) => c.farmId === effectiveFarmFilter);
     return scoped
       .map((crop) => ({
         crop,
@@ -43,18 +67,18 @@ export default function ForecastPage() {
         (a, b) =>
           Math.max(a.forecast.daysToWindowStart, 0) - Math.max(b.forecast.daysToWindowStart, 0)
       );
-  }, [crops, forecasts, farms, farmFilter, status]);
+  }, [crops, forecasts, farms, effectiveFarmFilter, status]);
 
   const counts = useMemo(() => {
     const scoped =
-      farmFilter === ALL_FARMS ? crops : crops.filter((c) => c.farmId === farmFilter);
+      effectiveFarmFilter === ALL_FARMS ? crops : crops.filter((c) => c.farmId === effectiveFarmFilter);
     const base: Record<string, number> = { all: scoped.length };
     for (const crop of scoped) {
       const s = forecasts[crop.id]?.readinessStatus;
       if (s) base[s] = (base[s] ?? 0) + 1;
     }
     return base;
-  }, [crops, forecasts, farmFilter]);
+  }, [crops, forecasts, effectiveFarmFilter]);
 
   const statuses: StatusFilter[] = [
     "all",
@@ -81,7 +105,12 @@ export default function ForecastPage() {
         ]}
         actions={
           <>
-            <Button size="sm" variant="secondary" onClick={() => refreshForecasts("forecast workspace")}>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => void refreshForecasts("forecast workspace", effectiveFarmFilter === ALL_FARMS ? undefined : effectiveFarmFilter)}
+              loading={refreshingForecasts}
+            >
               <RefreshCw className="h-4 w-4" aria-hidden />
               Refresh
             </Button>
@@ -135,7 +164,7 @@ export default function ForecastPage() {
 
           <select
             aria-label="Filter by farm"
-            value={farmFilter}
+            value={effectiveFarmFilter}
             onChange={(e) => {
               setFarmFilter(e.target.value);
               selectFarm(e.target.value);
@@ -216,10 +245,19 @@ export default function ForecastPage() {
                         {formatDate(row.crop.plantingDate)}
                       </td>
                       <td className="px-4 py-3 text-[12.5px] font-semibold text-forest-deep">
-                        {formatDateRange(
-                          row.forecast.estimatedWindowStart,
-                          row.forecast.estimatedWindowEnd
-                        )}
+                        <div className="flex flex-col gap-0.5">
+                          <span>
+                            {formatDateRange(
+                              row.forecast.estimatedWindowStart,
+                              row.forecast.estimatedWindowEnd
+                            )}
+                          </span>
+                          {row.forecast.weatherAdjustmentApplied ? (
+                            <span className="inline-block w-fit rounded-full bg-gold/15 px-2 py-0.5 font-mono text-[10.5px] font-semibold text-[#8a6415]">
+                              Weather {row.forecast.weatherAdjustmentDays && row.forecast.weatherAdjustmentDays > 0 ? `+${row.forecast.weatherAdjustmentDays}d` : `${row.forecast.weatherAdjustmentDays}d`}
+                            </span>
+                          ) : null}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-[12.5px] text-muted">
                         {row.forecast.daysToWindowStart > 0
@@ -232,7 +270,9 @@ export default function ForecastPage() {
                         <StatusBadge status={row.forecast.readinessStatus} />
                       </td>
                       <td className="hw-num px-4 py-3 text-[12.5px] font-semibold text-muted">
-                        {row.forecast.confidence ?? "—"}%
+                        {typeof row.forecast.confidence === "number"
+                          ? row.forecast.confidence
+                          : row.forecast.confidenceScore ?? "—"}%
                       </td>
                       <td className="px-4 py-3 text-right">
                         <Link

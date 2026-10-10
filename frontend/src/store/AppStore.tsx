@@ -20,6 +20,7 @@ import type {
   WeatherSummary,
 } from "@/types";
 import {
+  API_CONFIG,
   api,
   authApi,
   buildIntelligence,
@@ -125,7 +126,8 @@ interface StoreValue {
   setRecommendationStatus: (id: string, status: RecommendationStatus) => Promise<void>;
   updateSettings: (patch: Partial<AppSettings>) => Promise<void>;
   updateProfile: (patch: Partial<UserProfile>) => Promise<void>;
-  refreshForecasts: (scope?: string) => void;
+  refreshingForecasts: boolean;
+  refreshForecasts: (scope?: string, farmId?: string, cropId?: string) => Promise<void> | void;
   fetchFarmWeather: (farmId: string, forceRefresh?: boolean) => Promise<WeatherSummary | null>;
   resetDemoData: () => Promise<void>;
   markNotificationsRead: () => void;
@@ -153,6 +155,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [selectedFarmId, setSelectedFarmId] = useState<FarmSelection>(ALL_FARMS);
   const [readNotificationIds, setReadNotificationIds] = useState<string[]>([]);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [serverForecasts, setServerForecasts] = useState<Record<string, Forecast>>({});
+  const [refreshingForecasts, setRefreshingForecasts] = useState(false);
   const hydrated = useRef(false);
 
   const load = useCallback(async () => {
@@ -189,7 +193,27 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
       setSnapshot(data);
       hydrated.current = true;
-      setSelectedFarmId(data.settings?.defaultFarmId ?? data.farms[0]?.id ?? ALL_FARMS);
+      const validSelectedFarm = data.farms.some((f) => f.id === data.settings?.defaultFarmId)
+        ? data.settings.defaultFarmId!
+        : (data.farms[0]?.id ?? ALL_FARMS);
+      setSelectedFarmId(validSelectedFarm);
+
+      // 3. In live API mode, pull live harvest predictions from prediction engine
+      if (API_CONFIG.mode === "live") {
+        try {
+          const list = await api.listForecasts();
+          if (Array.isArray(list) && list.length > 0) {
+            const map: Record<string, Forecast> = {};
+            for (const f of list) {
+              map[f.cropId] = f;
+            }
+            setServerForecasts(map);
+          }
+        } catch (fcErr) {
+          console.warn("[HarvestWindow API] Unable to fetch live forecasts during snapshot load:", fcErr);
+        }
+      }
+
       setReady(true);
     } catch {
       setLoadError(
@@ -214,6 +238,16 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     setLocale(snapshot.settings.language);
   }, [snapshot.settings.language]);
 
+  // Guard selectedFarmId: if it points to a non-existent farm, fall back to first farm or ALL_FARMS
+  useEffect(() => {
+    if (!ready) return;
+    if (selectedFarmId === ALL_FARMS) return;
+    const exists = snapshot.farms.some((f) => f.id === selectedFarmId);
+    if (!exists) {
+      setSelectedFarmId(snapshot.farms[0]?.id ?? ALL_FARMS);
+    }
+  }, [ready, selectedFarmId, snapshot.farms]);
+
   const patch = useCallback(
     (updater: (prev: PersistedSnapshot) => PersistedSnapshot) =>
       setSnapshot((prev) => updater(prev)),
@@ -224,8 +258,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [weatherLoading, setWeatherLoading] = useState(false);
 
   const intelligence = useMemo(
-    () => buildIntelligence(snapshot.farms, snapshot.crops),
-    [snapshot.farms, snapshot.crops]
+    () => buildIntelligence(snapshot.farms, snapshot.crops, serverForecasts),
+    [snapshot.farms, snapshot.crops, serverForecasts]
   );
 
   const mergedWeather = useMemo(() => {
@@ -354,9 +388,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         };
 
         setSnapshot(updatedSnapshot);
-        setSelectedFarmId(
-          updatedSnapshot.settings?.defaultFarmId ?? liveFarms[0]?.id ?? ALL_FARMS
-        );
+        const validSelectedFarm = liveFarms.some((f) => f.id === updatedSnapshot.settings?.defaultFarmId)
+          ? updatedSnapshot.settings.defaultFarmId!
+          : (liveFarms[0]?.id ?? ALL_FARMS);
+        setSelectedFarmId(validSelectedFarm);
         localStore.save(updatedSnapshot, result.user.email);
         return { ok: true };
       } catch (err: unknown) {
@@ -677,6 +712,15 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         crops: [...prev.crops.filter((c) => c.id !== crop.id), crop],
         activity: [activity, ...prev.activity].slice(0, 40),
       }));
+
+      if (API_CONFIG.mode === "live") {
+        void api.getForecast(crop.id).then((fc) => {
+          if (fc) {
+            setServerForecasts((prev) => ({ ...prev, [crop.id]: fc }));
+          }
+        }).catch(() => {});
+      }
+
       toast({
         tone: "success",
         title: `${crop.name} added`,
@@ -695,6 +739,15 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         crops: prev.crops.map((c) => (c.id === id ? crop : c)),
         activity: [activity, ...prev.activity].slice(0, 40),
       }));
+
+      if (API_CONFIG.mode === "live") {
+        void api.getForecast(crop.id).then((fc) => {
+          if (fc) {
+            setServerForecasts((prev) => ({ ...prev, [crop.id]: fc }));
+          }
+        }).catch(() => {});
+      }
+
       toast({
         tone: "success",
         title: `${crop.name} updated`,
@@ -862,23 +915,44 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   );
 
   const refreshForecasts = useCallback<StoreValue["refreshForecasts"]>(
-    (scope) => {
-      pushActivity({
-        id: newActivityId(),
-        type: "forecast-refreshed",
-        message: scope
-          ? `Forecast refreshed · ${scope}`
-          : `All estimates refreshed across ${snapshot.farms.length} farm${
-              snapshot.farms.length === 1 ? "" : "s"
-            }`,
-        at: new Date().toISOString(),
-      });
-      toast({
-        tone: "info",
-        title: "Estimates refreshed",
-        description:
-          "Recomputed from the recorded planting dates, reference durations and demo weather.",
-      });
+    async (scope, farmId, cropId) => {
+      setRefreshingForecasts(true);
+      try {
+        const result = await api.refreshForecasts({ farmId, cropId });
+        if (result?.forecasts && result.forecasts.length > 0) {
+          setServerForecasts((prev) => {
+            const next = { ...prev };
+            for (const f of result.forecasts) {
+              next[f.cropId] = f;
+            }
+            return next;
+          });
+        }
+        pushActivity({
+          id: newActivityId(),
+          type: "forecast-refreshed",
+          message: scope
+            ? `Forecast refreshed · ${scope}`
+            : `All estimates refreshed across ${snapshot.farms.length} farm${
+                snapshot.farms.length === 1 ? "" : "s"
+              }`,
+          at: new Date().toISOString(),
+          farmId,
+          cropId,
+        });
+        toast({
+          tone: "info",
+          title: "Estimates refreshed",
+          description: `Updated ${result.updated} harvest forecast${
+            result.updated === 1 ? "" : "s"
+          } from prediction engine.`,
+        });
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Failed to refresh forecasts";
+        toast({ tone: "error", title: "Refresh failed", description: msg });
+      } finally {
+        setRefreshingForecasts(false);
+      }
     },
     [pushActivity, snapshot.farms.length, toast]
   );
@@ -981,6 +1055,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       setRecommendationStatus,
       updateSettings,
       updateProfile,
+      refreshingForecasts,
       refreshForecasts,
       fetchFarmWeather,
       resetDemoData,
@@ -1017,6 +1092,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       refreshRecommendations,
       setRecommendationStatus,
       updateSettings,
+      refreshingForecasts,
       refreshForecasts,
       fetchFarmWeather,
       resetDemoData,
