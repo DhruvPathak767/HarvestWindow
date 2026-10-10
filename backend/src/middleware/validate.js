@@ -9,7 +9,7 @@ export function validate(schema, source = "body") {
       next();
     } catch (err) {
       if (err instanceof ZodError) {
-        const errors = err.issues.map((issue) => ({
+        const errors = (err.issues || err.errors || []).map((issue) => ({
           field: issue.path.join(".") || "value",
           message: issue.message,
         }));

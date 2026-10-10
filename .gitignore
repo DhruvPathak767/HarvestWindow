@@ -1,10 +1,24 @@
-# Node dependencies
+# Dependencies
 node_modules/
-.vite/
+*/node_modules/
+.pnp
+.pnp.js
 
-# Production build artifacts
+# Environment variables & credentials
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+!.env.example
+!*.env.example
+
+# Build and production artifacts
 dist/
 dist-ssr/
+build/
+.vite/
 
 # Logs
 npm-debug.log*
@@ -12,9 +26,19 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+*.log
 
-# Editor / OS
+# Editor and OS files
 .DS_Store
-*.local
+Thumbs.db
 .vscode/
 .idea/
+*.local
+
+# Testing and coverage
+coverage/
+.nyc_output/
+
+# Temporary files
+.temp/
+.tmp/

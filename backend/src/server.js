@@ -8,9 +8,11 @@ async function startServer() {
 
     const server = app.listen(config.PORT, () => {
       console.log(`=================================================`);
-      console.log(` HarvestWindow Auth & API Server Running`);
+      console.log(` HarvestWindow Auth & Farm API Server Running`);
       console.log(` Environment : ${config.NODE_ENV}`);
       console.log(` Listening on: http://localhost:${config.PORT}`);
+      console.log(` Auth API    : http://localhost:${config.PORT}/api/v1/auth`);
+      console.log(` Farm API    : http://localhost:${config.PORT}/api/v1/farms`);
       console.log(` Allowed Origin: ${config.FRONTEND_URL}`);
       console.log(` Database    : MySQL (Prisma ORM)`);
       console.log(`=================================================`);

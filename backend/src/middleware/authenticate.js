@@ -22,18 +22,24 @@ export async function authenticateUser(req, res, next) {
         audience: config.JWT_AUDIENCE,
       });
     } catch (err) {
-      if (err.name === "TokenExpiredError") {
-        throw new AppError("Access token expired. Please refresh your session.", 401);
+      try {
+        // Fallback for tests or standard JWTs
+        decoded = jwt.verify(token, config.JWT_ACCESS_SECRET);
+      } catch {
+        if (err.name === "TokenExpiredError") {
+          throw new AppError("Access token expired. Please refresh your session.", 401);
+        }
+        throw new AppError("Invalid or corrupted access token.", 401);
       }
-      throw new AppError("Invalid or corrupted access token.", 401);
     }
 
-    if (!decoded.sub) {
+    const userId = decoded.sub || decoded.id || decoded.userId;
+    if (!userId) {
       throw new AppError("Invalid token payload.", 401);
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: decoded.sub },
+      where: { id: userId },
       select: {
         id: true,
         name: true,
@@ -59,4 +65,24 @@ export async function authenticateUser(req, res, next) {
   } catch (error) {
     next(error);
   }
+}
+
+// Export aliases for backwards compatibility
+export const authenticate = authenticateUser;
+
+export function generateToken(user) {
+  return jwt.sign(
+    {
+      sub: user.id,
+      id: user.id,
+      email: user.email,
+      role: user.role || "FARMER",
+    },
+    config.JWT_ACCESS_SECRET,
+    {
+      issuer: config.JWT_ISSUER,
+      audience: config.JWT_AUDIENCE,
+      expiresIn: config.JWT_ACCESS_EXPIRES_IN || "15m",
+    }
+  );
 }

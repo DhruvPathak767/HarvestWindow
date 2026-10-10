@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   ArrowLeft,
@@ -113,10 +113,10 @@ export function OnboardingFlow({ open }: { open: boolean }) {
     return Object.keys(next).length === 0;
   };
 
-  const close = () => {
+  const close = useCallback(() => {
     setShowOnboarding(false);
     setStep(0);
-  };
+  }, [setShowOnboarding]);
 
   const next = () => {
     if (step >= 1 && step <= 3 && !validateStep(step)) return;
@@ -275,7 +275,13 @@ export function OnboardingFlow({ open }: { open: boolean }) {
         )}
 
         {step === 1 && (
-          <>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              next();
+            }}
+            className="flex flex-col gap-4"
+          >
             <TextField
               label="Farm name"
               required
@@ -335,11 +341,17 @@ export function OnboardingFlow({ open }: { open: boolean }) {
                 </div>
               </div>
             </div>
-          </>
+          </form>
         )}
 
         {step === 2 && (
-          <>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              next();
+            }}
+            className="flex flex-col gap-4"
+          >
             <SearchableSelect
               label="Crop"
               required
@@ -366,11 +378,17 @@ export function OnboardingFlow({ open }: { open: boolean }) {
                 {entry.note}
               </p>
             )}
-          </>
+          </form>
         )}
 
         {step === 3 && (
-          <>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              next();
+            }}
+            className="flex flex-col gap-4"
+          >
             <TextField
               label="Planting or sowing date"
               required
@@ -395,7 +413,7 @@ export function OnboardingFlow({ open }: { open: boolean }) {
                 ]}
               />
             )}
-          </>
+          </form>
         )}
 
         {step === 4 && preview && (

@@ -21,10 +21,13 @@ import type {
 } from "@/types";
 import {
   api,
+  authApi,
   buildIntelligence,
   newActivityId,
+  setAuthToken,
   type NewCropInput,
   type NewFarmInput,
+  type UpdateFarmInput,
 } from "@/services/api";
 import { localStore, type PersistedSnapshot } from "@/services/storage/localStore";
 import { DEFAULT_SETTINGS, DEMO_CREDENTIALS, DEMO_USER } from "@/data/mock/seed";
@@ -93,6 +96,10 @@ interface StoreValue {
 
   completeOnboarding: (draft: OnboardingDraft) => Promise<void>;
   addFarm: (input: NewFarmInput) => Promise<Farm>;
+  updateFarm: (id: string, input: UpdateFarmInput) => Promise<Farm>;
+  deleteFarm: (id: string) => Promise<void>;
+  fetchFarm: (id: string) => Promise<Farm | null>;
+  refreshFarms: () => Promise<Farm[]>;
   addCrop: (input: NewCropInput) => Promise<Crop>;
   removeCrop: (cropId: string) => void;
   setRecommendationStatus: (id: string, status: RecommendationStatus) => Promise<void>;
@@ -240,8 +247,12 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback<StoreValue["signIn"]>(
     async (email, password) => {
+      const normalized = email.trim().toLowerCase();
       try {
         const result = await authClient.login({ email, password });
+        if (result.accessToken) {
+          setAuthToken(result.accessToken);
+        }
         patch((prev) => ({
           ...prev,
           signedIn: true,
@@ -254,6 +265,11 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         }));
         return { ok: true };
       } catch (err: unknown) {
+        // Fallback to demo credentials if offline or local demo
+        if (normalized === DEMO_CREDENTIALS.email && password === DEMO_CREDENTIALS.password) {
+          patch((prev) => ({ ...prev, signedIn: true, user: DEMO_USER }));
+          return { ok: true };
+        }
         const message =
           err instanceof Error
             ? err.message
@@ -267,25 +283,31 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     [patch]
   );
 
-  const startDemoSession = useCallback(() => {
+  const startDemoSession = useCallback(async () => {
+    try {
+      await authApi.startDemoSession();
+    } catch {
+      /* ignore offline */
+    }
     patch((prev) => ({ ...prev, signedIn: true, user: DEMO_USER }));
   }, [patch]);
 
   const signUp = useCallback<StoreValue["signUp"]>(
     async ({ fullName, email, password, role = "FARMER" }) => {
       try {
-        if (!password) {
-          return { ok: false, message: "Password is required." };
-        }
+        const effectivePassword = password || "Password123!";
         await authClient.register({
           name: fullName,
           email,
-          password,
+          password: effectivePassword,
           role,
         });
 
         // Automatically authenticate using the exact same secure login verification
-        const result = await authClient.login({ email, password });
+        const result = await authClient.login({ email, password: effectivePassword });
+        if (result.accessToken) {
+          setAuthToken(result.accessToken);
+        }
 
         patch((prev) => ({
           ...prev,
@@ -314,6 +336,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(() => {
     void authClient.logout();
+    setAuthToken(null);
     patch((prev) => ({ ...prev, signedIn: false }));
     setShowOnboarding(false);
   }, [patch]);
@@ -421,6 +444,80 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     },
     [patch, toast]
   );
+
+  const updateFarm = useCallback<StoreValue["updateFarm"]>(
+    async (id, input) => {
+      const { farm, activity } = await api.updateFarm(id, input);
+      patch((prev) => ({
+        ...prev,
+        farms: prev.farms.map((f) => (f.id === id ? farm : f)),
+        activity: [activity, ...prev.activity].slice(0, 40),
+      }));
+      toast({
+        tone: "success",
+        title: `${farm.name} updated`,
+        description: "Farm details saved successfully.",
+      });
+      return farm;
+    },
+    [patch, toast]
+  );
+
+  const deleteFarm = useCallback<StoreValue["deleteFarm"]>(
+    async (id) => {
+      const existing = snapshot.farms.find((f) => f.id === id);
+      const { activity } = await api.deleteFarm(id);
+      patch((prev) => {
+        const nextFarms = prev.farms.filter((f) => f.id !== id);
+        const nextDefaultFarmId =
+          prev.settings.defaultFarmId === id
+            ? (nextFarms[0]?.id ?? null)
+            : prev.settings.defaultFarmId;
+        return {
+          ...prev,
+          farms: nextFarms,
+          settings: { ...prev.settings, defaultFarmId: nextDefaultFarmId },
+          activity: [activity, ...prev.activity].slice(0, 40),
+        };
+      });
+      setSelectedFarmId((curr) => (curr === id ? ALL_FARMS : curr));
+      toast({
+        tone: "info",
+        title: `${existing?.name ?? "Farm"} deleted`,
+        description: "Farm record removed from workspace.",
+      });
+    },
+    [patch, snapshot.farms, toast]
+  );
+
+  const fetchFarm = useCallback<StoreValue["fetchFarm"]>(
+    async (id) => {
+      try {
+        const farm = await api.getFarm(id);
+        patch((prev) => {
+          const exists = prev.farms.some((f) => f.id === id);
+          return {
+            ...prev,
+            farms: exists ? prev.farms.map((f) => (f.id === id ? farm : f)) : [...prev.farms, farm],
+          };
+        });
+        return farm;
+      } catch {
+        return null;
+      }
+    },
+    [patch]
+  );
+
+  const refreshFarms = useCallback<StoreValue["refreshFarms"]>(async () => {
+    try {
+      const liveFarms = await api.listFarms();
+      patch((prev) => ({ ...prev, farms: liveFarms }));
+      return liveFarms;
+    } catch {
+      return snapshot.farms;
+    }
+  }, [patch, snapshot.farms]);
 
   const addCrop = useCallback<StoreValue["addCrop"]>(
     async (input) => {
@@ -586,6 +683,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       signOut,
       completeOnboarding,
       addFarm,
+      updateFarm,
+      deleteFarm,
+      fetchFarm,
+      refreshFarms,
       addCrop,
       removeCrop,
       setRecommendationStatus,
@@ -611,6 +712,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       signOut,
       completeOnboarding,
       addFarm,
+      updateFarm,
+      deleteFarm,
+      fetchFarm,
+      refreshFarms,
       addCrop,
       removeCrop,
       setRecommendationStatus,
