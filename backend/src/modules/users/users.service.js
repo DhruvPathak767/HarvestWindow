@@ -16,8 +16,9 @@ export class UsersService {
   async updateProfile(userId, updateData) {
     // Strictly prevent role escalation through profile update
     const allowedData = {};
-    if (updateData.name && typeof updateData.name === "string") {
-      allowedData.name = updateData.name.trim();
+    const nameVal = updateData.name || updateData.fullName;
+    if (nameVal && typeof nameVal === "string") {
+      allowedData.name = nameVal.trim();
     }
 
     if (Object.keys(allowedData).length === 0) {

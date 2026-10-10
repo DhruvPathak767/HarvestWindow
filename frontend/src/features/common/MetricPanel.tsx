@@ -3,12 +3,18 @@ import { motion, useReducedMotion } from "framer-motion";
 import { CountUp } from "@/components/common/CountUp";
 import { cn } from "@/utils/cn";
 
-export type MetricTone = "forest" | "gold" | "caution" | "info" | "earth";
+export type MetricTone = "forest" | "gold" | "caution" | "info" | "earth" | "living";
 
 const TONES: Record<MetricTone, { ring: string; icon: string; value: string; bar: string }> = {
   forest: {
     ring: "bg-soft text-forest",
     icon: "text-forest",
+    value: "text-forest-deep",
+    bar: "bg-living",
+  },
+  living: {
+    ring: "bg-living/15 text-living",
+    icon: "text-living",
     value: "text-forest-deep",
     bar: "bg-living",
   },
@@ -62,7 +68,7 @@ export function MetricPanel({
   footer?: ReactNode;
 }) {
   const reduced = useReducedMotion();
-  const styles = TONES[tone];
+  const styles = TONES[tone] ?? TONES.forest;
   const Wrapper = onClick ? motion.button : motion.div;
 
   return (

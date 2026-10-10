@@ -1,14 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useOutletContext } from "react-router-dom";
 import {
   AlertTriangle,
   ArrowRight,
+  BarChart3,
   CalendarRange,
+  CheckCircle2,
+  Clock,
   CloudRain,
   Droplets,
   Layers,
   MapPin,
   Plus,
+  RefreshCw,
   Sparkles,
   Sprout,
   Thermometer,
@@ -24,10 +28,12 @@ import { HarvestTimeline } from "@/components/charts/HarvestTimeline";
 import { CropImage } from "@/components/common/CropImage";
 import { CROP_IMAGES } from "@/data/mock/cropCatalog";
 import { ALL_FARMS, useStore } from "@/store/AppStore";
-import { useDashboardMetrics } from "@/hooks/useDashboardMetrics";
+import { api, type DashboardData } from "@/services/api";
 import { CONDITION_LABEL } from "@/services/weather/weatherService";
 import { formatDate, relativeTime } from "@/utils/date";
+import { formatArea, formatTemperature } from "@/utils/units";
 import { cn } from "@/utils/cn";
+import { CropStatusChart } from "./CropStatusChart";
 
 type Filter = "all" | "approaching" | "in-window" | "attention";
 
@@ -55,18 +61,47 @@ export default function DashboardPage() {
     weather,
     recommendations,
     activity,
+    settings,
     user,
     selectedFarmId,
     selectFarm,
     onboarded,
     setShowOnboarding,
     setRecommendationStatus,
+    refreshForecasts,
+    refreshingForecasts,
   } = useStore();
 
-  const metrics = useDashboardMetrics();
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [loadingDashboard, setLoadingDashboard] = useState<boolean>(true);
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
+
   const [activeCropId, setActiveCropId] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
+
+  const fetchDashboard = useCallback(async () => {
+    setLoadingDashboard(true);
+    setDashboardError(null);
+    try {
+      const data = await api.getDashboard();
+      setDashboardData(data);
+    } catch (err: unknown) {
+      console.warn("[DashboardPage] Failed to fetch backend dashboard:", err);
+      setDashboardError(err instanceof Error ? err.message : "Unable to load dashboard data");
+    } finally {
+      setLoadingDashboard(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchDashboard();
+  }, [fetchDashboard, crops.length, farms.length]);
+
+  const handleRefreshAll = async () => {
+    await refreshForecasts();
+    await fetchDashboard();
+  };
 
   const visibleCrops = useMemo(
     () => (selectedFarmId === ALL_FARMS ? crops : crops.filter((c) => c.farmId === selectedFarmId)),
@@ -132,15 +167,46 @@ export default function DashboardPage() {
     return stamps.reduce((a, b) => (a > b ? a : b));
   }, [forecasts]);
 
+  // Derived or authoritative backend statistics
+  const overviewStats = useMemo(() => {
+    if (dashboardData?.overview) {
+      return {
+        totalFarms: dashboardData.overview.totalFarms,
+        totalTrackedArea: dashboardData.overview.totalTrackedArea,
+        totalActiveCrops: dashboardData.overview.totalActiveCrops,
+        approachingHarvest: dashboardData.overview.approachingHarvest,
+        readyForHarvest: dashboardData.overview.readyForHarvest,
+        overdueHarvests: dashboardData.overview.overdueHarvests,
+      };
+    }
+    // Fallback if backend dashboard data is still loading
+    return {
+      totalFarms: farms.length,
+      totalTrackedArea: farms.reduce((acc, f) => acc + (f.area || 0), 0),
+      totalActiveCrops: crops.filter((c) => c.growthStage !== "HARVESTED").length,
+      approachingHarvest: Object.values(forecasts).filter((f) => f.readinessStatus === "approaching").length,
+      readyForHarvest: Object.values(forecasts).filter((f) => f.readinessStatus === "in-window").length,
+      overdueHarvests: 0,
+    };
+  }, [dashboardData, farms, crops, forecasts]);
+
+  const upcomingHarvestsList = useMemo(() => {
+    if (dashboardData?.upcomingHarvests && dashboardData.upcomingHarvests.length > 0) {
+      if (selectedFarmId === ALL_FARMS) return dashboardData.upcomingHarvests;
+      return dashboardData.upcomingHarvests.filter((h) => h.farmId === selectedFarmId);
+    }
+    return [];
+  }, [dashboardData, selectedFarmId]);
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         variant="hero"
         aside={
-          metrics.nextHarvest ? (
+          upcomingHarvestsList[0] ? (
             <button
               type="button"
-              onClick={() => navigate(`/app/crops/${metrics.nextHarvest!.crop.id}`)}
+              onClick={() => navigate(`/app/crops/${upcomingHarvestsList[0].cropId}`)}
               className="hw-hud flex items-center gap-3 rounded-full py-1.5 pr-4 pl-1.5 text-left transition-colors hover:border-gold/50"
             >
               <span className="grid h-8 w-8 place-items-center rounded-full bg-gold/20 text-gold">
@@ -149,7 +215,7 @@ export default function DashboardPage() {
               <span>
                 <span className="block text-[10px] tracking-wide text-sage/70 uppercase">Next harvest</span>
                 <span className="block font-display text-[12.5px] font-semibold text-cream">
-                  {metrics.nextHarvest.crop.name} · {formatDate(metrics.nextHarvest.forecast.estimatedWindowStart)}
+                  {upcomingHarvestsList[0].cropName} · {(upcomingHarvestsList[0].harvestWindow?.startDate || upcomingHarvestsList[0].estimatedWindowStart) ? formatDate(upcomingHarvestsList[0].harvestWindow?.startDate || upcomingHarvestsList[0].estimatedWindowStart!) : "Pending"}
                 </span>
               </span>
             </button>
@@ -164,9 +230,11 @@ export default function DashboardPage() {
         subtitle={
           selectedFarmId === ALL_FARMS
             ? "Every farm in the plan, with the blocks closest to their estimated harvest window first."
-            : `${activeFarm?.district}, ${activeFarm?.state} · ${activeFarm?.area} ${
-                activeFarm?.areaUnit === "hectare" ? "hectares" : "acres"
-              }`
+            : `${activeFarm?.district}, ${activeFarm?.state} · ${formatArea(
+                activeFarm?.area ?? 0,
+                activeFarm?.areaUnit ?? "hectare",
+                settings.areaUnit
+              )}`
         }
         meta={[
           {
@@ -204,6 +272,16 @@ export default function DashboardPage() {
               variant="inverse"
               size="sm"
               className="rounded-full bg-white/10 text-cream border-white/20 hover:bg-white/15"
+              onClick={handleRefreshAll}
+              loading={refreshingForecasts || loadingDashboard}
+            >
+              <RefreshCw className="h-4 w-4" aria-hidden />
+              Refresh
+            </Button>
+            <Button
+              variant="inverse"
+              size="sm"
+              className="rounded-full bg-white/10 text-cream border-white/20 hover:bg-white/15"
               onClick={() => navigate("/app/farms")}
             >
               <Layers className="h-4 w-4" aria-hidden />
@@ -216,6 +294,18 @@ export default function DashboardPage() {
           </>
         }
       />
+
+      {dashboardError && (
+        <div className="flex items-center justify-between rounded-md border border-caution/40 bg-caution/10 p-4 text-[13px] text-forest-deep">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="h-4 w-4 text-caution shrink-0" />
+            <span>Could not load the latest live dashboard metrics: {dashboardError}</span>
+          </div>
+          <Button size="sm" variant="secondary" onClick={fetchDashboard}>
+            Retry
+          </Button>
+        </div>
+      )}
 
       {!onboarded && (
         <div className="flex flex-col gap-3 rounded-md border border-gold/50 bg-gold-soft/35 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -241,77 +331,183 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Key intelligence indicators */}
-      <section aria-label="Key indicators" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/* A. Key Overview Statistics (Authoritative Backend Data) */}
+      <section aria-label="Key indicators" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <MetricPanel
-          label="Active fields"
-          value={metrics.activeFields}
+          label="Tracked farms"
+          value={overviewStats.totalFarms}
           icon={<Layers className="h-4 w-4" aria-hidden />}
           tone="forest"
           delay={0}
-          context={`${crops.length} crop records tracked across ${farms.length} farm${
-            farms.length === 1 ? "" : "s"
-          }.`}
+          context={`${overviewStats.totalFarms} farm${overviewStats.totalFarms === 1 ? "" : "s"} registered.`}
           onClick={() => navigate("/app/farms")}
         />
         <MetricPanel
-          label="Approaching window"
-          value={metrics.approaching + metrics.inWindow}
+          label="Total tracked area"
+          value={formatArea(overviewStats.totalTrackedArea, "hectare", settings.areaUnit)}
+          icon={<MapPin className="h-4 w-4" aria-hidden />}
+          tone="forest"
+          delay={0.04}
+          context={`Converted to your preferred ${settings.areaUnit}s.`}
+          onClick={() => navigate("/app/farms")}
+        />
+        <MetricPanel
+          label="Active crops"
+          value={overviewStats.totalActiveCrops}
+          icon={<Sprout className="h-4 w-4" aria-hidden />}
+          tone="living"
+          delay={0.08}
+          context={`${overviewStats.totalActiveCrops} growing blocks in the field.`}
+          onClick={() => navigate("/app")}
+        />
+        <MetricPanel
+          label="Approaching harvest"
+          value={overviewStats.approachingHarvest}
           icon={<CalendarRange className="h-4 w-4" aria-hidden />}
           tone="gold"
-          delay={0.06}
-          context={`${metrics.inWindow} open now · ${metrics.approaching} opening within three weeks.`}
+          delay={0.12}
+          context="Opening in the next 14 to 21 days."
           onClick={() => navigate("/app/forecast")}
         />
         <MetricPanel
-          label="Needs attention"
-          value={metrics.attention}
-          icon={<AlertTriangle className="h-4 w-4" aria-hidden />}
+          label="Ready for harvest"
+          value={overviewStats.readyForHarvest}
+          icon={<CheckCircle2 className="h-4 w-4" aria-hidden />}
           tone="caution"
-          delay={0.12}
-          context={
-            metrics.attention === 0
-              ? "Nothing flagged right now."
-              : "Weather caution or a window that has already closed."
-          }
-          onClick={() => navigate("/app/recommendations")}
-        />
-        <MetricPanel
-          label="Next estimated harvest"
-          value={
-            metrics.nextHarvest
-              ? `${metrics.nextHarvest.crop.name.split(" ")[0]}`
-              : "—"
-          }
-          icon={<Sprout className="h-4 w-4" aria-hidden />}
-          tone="earth"
-          delay={0.18}
-          context={
-            metrics.nextHarvest
-              ? `${formatDate(metrics.nextHarvest.forecast.estimatedWindowStart)} · ${
-                  metrics.nextHarvest.farmName
-                }`
-              : "No upcoming window in this selection."
-          }
-          onClick={() =>
-            metrics.nextHarvest && navigate(`/app/crops/${metrics.nextHarvest.crop.id}`)
-          }
-          footer={
-            metrics.nextHarvest ? (
-              <StatusBadge status={metrics.nextHarvest.forecast.readinessStatus} />
-            ) : undefined
-          }
+          delay={0.16}
+          context="Currently inside optimal harvest window."
+          onClick={() => navigate("/app/forecast")}
         />
       </section>
 
-      {/* Signature harvest window */}
+      {/* B. Upcoming Harvest Opportunities Section */}
+      <section aria-label="Upcoming harvest opportunities">
+        <Card>
+          <CardHeader
+            title="Next predicted harvest opportunities"
+            subtitle="Chronologically ordered by estimated harvest readiness window."
+            icon={<Clock className="h-4 w-4" aria-hidden />}
+            action={
+              <Link
+                to="/app/forecast"
+                className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-forest transition-colors hover:text-living"
+              >
+                View all in forecast workspace
+                <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+              </Link>
+            }
+          />
+          <div className="p-5">
+            {upcomingHarvestsList.length > 0 ? (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {upcomingHarvestsList.slice(0, 6).map((harvest) => (
+                  <div
+                    key={harvest.cropId}
+                    onClick={() => navigate(`/app/crops/${harvest.cropId}`)}
+                    className="flex flex-col justify-between rounded-md border border-line bg-cream/40 p-4 transition-all duration-200 hover:border-living/60 hover:bg-cream/70 cursor-pointer"
+                  >
+                    <div>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-display text-[14.5px] font-bold text-forest-deep truncate">
+                            {harvest.cropName}
+                          </p>
+                          {(harvest.variety || harvest.cropVariety) && (
+                            <p className="font-mono text-[11px] text-muted truncate">
+                              {harvest.variety || harvest.cropVariety}
+                            </p>
+                          )}
+                        </div>
+                        <StatusBadge status={harvest.readinessStatus as any} />
+                      </div>
+
+                      <p className="mt-2 text-[12px] text-muted">
+                        Farm: <span className="font-semibold text-forest-deep">{harvest.farmName}</span>
+                      </p>
+
+                      <div className="mt-3 flex items-baseline justify-between border-t border-line/60 pt-2 text-[12px]">
+                        <span className="text-muted">Window:</span>
+                        <span className="font-mono font-medium text-forest-deep">
+                          {(harvest.harvestWindow?.startDate || harvest.estimatedWindowStart) ? formatDate(harvest.harvestWindow?.startDate || harvest.estimatedWindowStart!) : "—"}
+                          {" → "}
+                          {(harvest.harvestWindow?.endDate || harvest.estimatedWindowEnd) ? formatDate(harvest.harvestWindow?.endDate || harvest.estimatedWindowEnd!) : "—"}
+                        </span>
+                      </div>
+
+                      {(() => {
+                        const days = harvest.daysRemaining ?? harvest.daysToWindowStart ?? harvest.daysUntilHarvest;
+                        if (days === null || days === undefined) return null;
+                        return (
+                          <div className="mt-1 flex items-baseline justify-between text-[12px]">
+                            <span className="text-muted">Days remaining:</span>
+                            <span className="font-bold text-forest-deep">
+                              {days > 0
+                                ? `${days} days`
+                                : days === 0
+                                ? "Window open today"
+                                : `${Math.abs(days)} days ago`}
+                            </span>
+                          </div>
+                        );
+                      })()}
+
+                      <div className="mt-1 flex items-baseline justify-between text-[11.5px]">
+                        <span className="text-muted">Confidence:</span>
+                        <span className="font-mono font-semibold text-living">
+                          {harvest.confidenceScore}%
+                        </span>
+                      </div>
+                    </div>
+
+                    {harvest.actionableAdvice && (
+                      <p className="mt-3 rounded bg-white/70 p-2 text-[11.5px] leading-relaxed text-muted border border-line/40">
+                        {harvest.actionableAdvice}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                icon={<Sprout className="h-5 w-5" aria-hidden />}
+                title="No upcoming harvests predicted yet"
+                description="Add your crops with their sowing dates to calculate predicted harvest windows."
+                action={
+                  <Button size="sm" onClick={openAddCrop}>
+                    <Plus className="h-4 w-4" aria-hidden />
+                    Add crop
+                  </Button>
+                }
+              />
+            )}
+          </div>
+        </Card>
+      </section>
+
+      {/* C & D. Crop Status Distribution & Signature Harvest Window */}
       <section
-        aria-label="Harvest window"
-        className="grid gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]"
+        aria-label="Crop Analytics & Timeline"
+        className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1.4fr)]"
       >
+        {/* C. Crop Status Visualization (Chart) */}
+        <Card>
+          <CardHeader
+            title="Crop growth stage distribution"
+            subtitle="Current developmental distribution across active fields."
+            icon={<BarChart3 className="h-4 w-4" aria-hidden />}
+          />
+          <div className="p-5">
+            <CropStatusChart
+              distribution={dashboardData?.cropStatusDistribution ?? []}
+              height={260}
+            />
+          </div>
+        </Card>
+
+        {/* D. Signature Harvest Window Timeline for Active Crop */}
         <Card className="overflow-hidden">
           <CardHeader
-            title="Harvest window"
+            title="Harvest window focus"
             subtitle="The estimated range for the selected block, with today marked against it."
             icon={<CalendarRange className="h-4 w-4" aria-hidden />}
             action={
@@ -395,19 +591,21 @@ export default function DashboardPage() {
             )}
           </div>
         </Card>
+      </section>
 
-        {/* Weather strip */}
+      {/* Weather Strip Context */}
+      <section aria-label="Weather context">
         <Card className="flex flex-col">
           <CardHeader
             title="Weather context"
-            subtitle={activeWeather?.locationLabel ?? "Select a farm"}
+            subtitle={activeWeather?.locationLabel ?? "Select a farm to inspect weather"}
             icon={<CloudRain className="h-4 w-4" aria-hidden />}
             action={
               <Link
                 to="/app/weather"
                 className="text-[12.5px] font-semibold text-forest transition-colors hover:text-living"
               >
-                Open
+                Open weather view
               </Link>
             }
           />
@@ -415,7 +613,7 @@ export default function DashboardPage() {
             <div className="flex flex-1 flex-col p-5">
               <div className="flex items-end justify-between gap-4">
                 <p className="hw-num text-[42px] leading-none font-extrabold text-forest-deep">
-                  {activeWeather.temperatureC}°
+                  {formatTemperature(activeWeather.temperatureC, settings.temperatureUnit)}
                 </p>
                 <div className="text-right">
                   <p className="font-display text-[13px] font-semibold text-forest-deep">
@@ -431,7 +629,11 @@ export default function DashboardPage() {
                 {[
                   { icon: Droplets, label: "Humidity", value: `${activeWeather.humidity}%` },
                   { icon: Wind, label: "Wind", value: `${activeWeather.windKph} km/h` },
-                  { icon: Thermometer, label: "Feels like", value: `${activeWeather.feelsLikeC}°` },
+                  {
+                    icon: Thermometer,
+                    label: "Feels like",
+                    value: formatTemperature(activeWeather.feelsLikeC, settings.temperatureUnit),
+                  },
                 ].map((item) => (
                   <div key={item.label}>
                     <dt className="flex items-center gap-1 text-[11px] text-muted">
@@ -454,8 +656,8 @@ export default function DashboardPage() {
                         d.rainfallMm >= 15
                           ? "bg-info"
                           : d.rainfallMm > 0
-                            ? "bg-info/50"
-                            : "bg-line"
+                          ? "bg-info/50"
+                          : "bg-line"
                       )}
                       style={{ height: Math.max(4, Math.min(40, d.rainfallMm * 1.5 + 4)) }}
                       title={`${d.date}: ${d.rainfallMm} mm`}
@@ -482,24 +684,20 @@ export default function DashboardPage() {
                   </p>
                 </div>
               )}
-
-              <p className="mt-auto pt-4 font-mono text-[10px] tracking-wide text-muted uppercase">
-                {activeWeather.sourceLabel} · demo dataset
-              </p>
             </div>
           ) : (
             <div className="p-5">
               <EmptyState
                 icon={<CloudRain className="h-5 w-5" aria-hidden />}
                 title="No farm selected"
-                description="Choose a farm to see the weather context attached to its crops."
+                description="Choose a farm to view the weather conditions attached to its crops."
               />
             </div>
           )}
         </Card>
       </section>
 
-      {/* Crop overview */}
+      {/* Crop Overview List */}
       <section aria-label="Crop overview">
         <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -585,16 +783,23 @@ export default function DashboardPage() {
         )}
       </section>
 
-      {/* Activity + recommendations */}
+      {/* Activity & Recommendations */}
       <section aria-label="Activity and actions" className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
         <Card>
           <CardHeader
             title="Recent activity"
-            subtitle="Mock events from this demo workspace — updated as you work."
+            subtitle="Agricultural records and harvest estimate updates."
             icon={<Sparkles className="h-4 w-4" aria-hidden />}
           />
           <div className="p-5">
-            <ActivityFeed events={activity} limit={6} />
+            <ActivityFeed
+              events={
+                dashboardData?.recentActivity && dashboardData.recentActivity.length > 0
+                  ? (dashboardData.recentActivity as any)
+                  : activity
+              }
+              limit={6}
+            />
           </div>
         </Card>
 

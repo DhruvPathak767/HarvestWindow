@@ -26,6 +26,7 @@ import { ALL_FARMS, useStore } from "@/store/AppStore";
 import { CONDITION_LABEL } from "@/services/weather/weatherService";
 import { detectBrowserLocation } from "@/services/location/geolocationService";
 import { formatDate, formatWeekday, relativeTime } from "@/utils/date";
+import { formatTemperature } from "@/utils/units";
 import { cn } from "@/utils/cn";
 
 const CONDITION_ICON: Record<string, typeof Sun> = {
@@ -43,6 +44,7 @@ export default function WeatherPage() {
     forecasts,
     weather,
     weatherLoading,
+    settings,
     selectedFarmId,
     selectFarm,
     fetchFarmWeather,
@@ -260,10 +262,10 @@ export default function WeatherPage() {
               <div>
                 <p className="hw-eyebrow font-semibold text-sage/80">Most recent reading</p>
                 <p className="hw-num mt-2 text-[52px] leading-none font-extrabold">
-                  {summary.temperatureC}°
+                  {formatTemperature(summary.temperatureC, settings.temperatureUnit)}
                 </p>
                 <p className="mt-2 font-display text-[14px] font-semibold">
-                  {(CONDITION_LABEL[summary.condition] || "Partly cloudy")} · feels like {summary.feelsLikeC ?? summary.temperatureC}°
+                  {(CONDITION_LABEL[summary.condition] || "Partly cloudy")} · feels like {formatTemperature(summary.feelsLikeC ?? summary.temperatureC, settings.temperatureUnit)}
                 </p>
               </div>
               <span className="grid h-14 w-14 place-items-center rounded-full border border-white/15 bg-white/10 text-gold">

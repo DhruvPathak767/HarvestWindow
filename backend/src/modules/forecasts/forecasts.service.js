@@ -69,11 +69,23 @@ export async function getForecasts(userId, filters = {}) {
 
   // If farmId is specified, ensure it belongs to the user
   if (filters.farmId) {
+    const farm = await prisma.farm.findFirst({
+      where: { id: filters.farmId, userId },
+    });
+    if (!farm) {
+      throw new AppError("Farm not found or unauthorized", 404);
+    }
     where.farmId = filters.farmId;
   }
 
   // If cropId is specified, ensure it belongs to user's farm
   if (filters.cropId) {
+    const crop = await prisma.crop.findFirst({
+      where: { id: filters.cropId, farm: { userId } },
+    });
+    if (!crop) {
+      throw new AppError("Crop not found or unauthorized", 404);
+    }
     where.id = filters.cropId;
   }
 
@@ -121,6 +133,32 @@ export async function getForecasts(userId, filters = {}) {
         f.readinessStatus.toLowerCase() === targetStatus ||
         f.readinessLevel.toLowerCase() === targetStatus
     );
+  }
+
+  // Date range filtering
+  const fromDate = filters.dateFrom || filters.startDate;
+  if (fromDate) {
+    forecasts = forecasts.filter((f) => {
+      const end = f.harvestWindow?.endDate;
+      return end && end >= fromDate;
+    });
+  }
+
+  const toDate = filters.dateTo || filters.endDate;
+  if (toDate) {
+    forecasts = forecasts.filter((f) => {
+      const start = f.harvestWindow?.startDate;
+      return start && start <= toDate;
+    });
+  }
+
+  // Chronological sorting
+  if (filters.sortBy === "date" || filters.sort === "date" || filters.chronological === "true") {
+    forecasts.sort((a, b) => {
+      const startA = a.harvestWindow?.startDate || "9999-12-31";
+      const startB = b.harvestWindow?.startDate || "9999-12-31";
+      return startA.localeCompare(startB);
+    });
   }
 
   const total = forecasts.length;

@@ -14,6 +14,7 @@ import type {
   Crop,
   Farm,
   Forecast,
+  Priority,
   Recommendation,
   RecommendationStatus,
   UserProfile,
@@ -38,7 +39,7 @@ import {
   type PersistedSnapshot,
 } from "@/services/storage/localStore";
 import { DEFAULT_SETTINGS, DEMO_CREDENTIALS, DEMO_USER } from "@/data/mock/seed";
-import { setLocale } from "@/utils/date";
+import { formatDate, setLocale } from "@/utils/date";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { authClient, type AuthUser } from "@/services/api/authClient";
 import { openMeteoWeatherProvider } from "@/services/weather/openMeteoProvider";
@@ -197,7 +198,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         : (data.farms[0]?.id ?? ALL_FARMS);
       setSelectedFarmId(validSelectedFarm);
 
-      // 3. In live API mode, pull live harvest predictions from prediction engine
+      // 3. In live API mode, pull live harvest predictions and saved user settings
       if (API_CONFIG.mode === "live") {
         try {
           const list = await api.listForecasts();
@@ -210,6 +211,27 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           }
         } catch (fcErr) {
           console.warn("[HarvestWindow API] Unable to fetch live forecasts during snapshot load:", fcErr);
+        }
+
+        try {
+          const settingsData = await api.getSettings();
+          if (settingsData?.preferences) {
+            data.settings = {
+              ...data.settings,
+              areaUnit: settingsData.preferences.areaUnit as AreaUnit,
+              language: settingsData.preferences.language as any,
+              defaultFarmId: settingsData.preferences.defaultFarmId,
+              notifications: {
+                ...data.settings.notifications,
+                ...settingsData.preferences.notifications,
+              },
+            };
+          }
+          if (settingsData?.profile?.name) {
+            data.user.fullName = settingsData.profile.name;
+          }
+        } catch (settingsErr) {
+          console.warn("[HarvestWindow API] Unable to fetch live settings during snapshot load:", settingsErr);
         }
       }
 
@@ -304,6 +326,80 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     () => notifications.filter((n) => !readNotificationIds.includes(n.id)).length,
     [notifications, readNotificationIds]
   );
+
+  const allRecommendations = useMemo<Recommendation[]>(() => {
+    const existingMap = new Map<string, Recommendation>();
+    for (const r of snapshot.recommendations) {
+      existingMap.set(r.id, r);
+    }
+
+    // Synthesize intelligent recommendations for active crops if none recorded
+    for (const crop of snapshot.crops) {
+      const fc = intelligence.forecasts[crop.id];
+      const farm = snapshot.farms.find((f) => f.id === crop.farmId);
+      const farmWeather = mergedWeather[crop.farmId];
+
+      let recId = `rec-${crop.id}-timing`;
+      let title = `Log stage observation for ${crop.name}`;
+      let reason = `Current stage is recorded as ${crop.growthStage || "active growth"}. Field observations refine harvest window predictions.`;
+      let priority: Priority = "medium";
+      let suggestedAction = fc?.nextAction || `Walk the block and record visible growth stage in the field.`;
+      let category: Recommendation["category"] = "monitoring";
+
+      if (fc?.readinessStatus === "in-window") {
+        recId = `rec-${crop.id}-harvest`;
+        title = `Check harvest readiness for ${crop.name}`;
+        reason = `Crop is within its estimated harvest window (${fc.estimatedWindowStart ? formatDate(fc.estimatedWindowStart) : "now"} to ${fc.estimatedWindowEnd ? formatDate(fc.estimatedWindowEnd) : "soon"}).`;
+        priority = "high";
+        suggestedAction = fc.nextAction || `Sample grain or pod maturity and finalize picking crew schedule.`;
+        category = "timing";
+      } else if (fc?.readinessStatus === "approaching") {
+        recId = `rec-${crop.id}-approaching`;
+        title = `Schedule harvest logistics for ${crop.name}`;
+        reason = `Estimated harvest window opens in ${fc.daysToWindowStart > 0 ? `${fc.daysToWindowStart} days` : "about a week"}.`;
+        priority = "medium";
+        suggestedAction = fc.nextAction || `Inspect crop development and secure drying yard or storage capacity.`;
+        category = "logistics";
+      }
+
+      if (!existingMap.has(recId)) {
+        existingMap.set(recId, {
+          id: recId,
+          cropId: crop.id,
+          farmId: crop.farmId,
+          title,
+          reason,
+          priority,
+          suggestedAction,
+          status: "open",
+          createdAt: crop.createdAt || new Date().toISOString(),
+          relevantDate: fc?.estimatedWindowStart || undefined,
+          category,
+        });
+      }
+
+      if (farmWeather?.cautions && farmWeather.cautions.length > 0) {
+        const caution = farmWeather.cautions[0];
+        const weatherRecId = `rec-${crop.id}-weather`;
+        if (!existingMap.has(weatherRecId)) {
+          existingMap.set(weatherRecId, {
+            id: weatherRecId,
+            cropId: crop.id,
+            farmId: crop.farmId,
+            title: `Review weather impact: ${caution.title}`,
+            reason: `${farm?.name || "Farm"}: ${caution.detail}`,
+            priority: caution.level === "caution" ? "high" : "medium",
+            suggestedAction: fc?.nextAction || `Monitor field drainage and protect produce during weather fluctuations.`,
+            status: "open",
+            createdAt: farmWeather.observedAt || new Date().toISOString(),
+            category: "weather",
+          });
+        }
+      }
+    }
+
+    return Array.from(existingMap.values());
+  }, [snapshot.recommendations, snapshot.crops, snapshot.farms, intelligence.forecasts, mergedWeather]);
 
   const pushActivity = useCallback(
     (event: ActivityEvent) =>
@@ -782,27 +878,32 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
   const setRecommendationStatus = useCallback<StoreValue["setRecommendationStatus"]>(
     async (id, status) => {
-      const rec = snapshot.recommendations.find((r) => r.id === id);
-      patch((prev) => ({
-        ...prev,
-        recommendations: prev.recommendations.map((r) =>
-          r.id === id ? { ...r, status } : r
-        ),
-        activity:
-          status === "completed" && rec
-            ? [
-                {
-                  id: newActivityId(),
-                  type: "recommendation-completed" as const,
-                  message: `Completed: ${rec.title}`,
-                  at: new Date().toISOString(),
-                  farmId: rec.farmId,
-                  cropId: rec.cropId,
-                },
-                ...prev.activity,
-              ].slice(0, 40)
-            : prev.activity,
-      }));
+      const rec = allRecommendations.find((r) => r.id === id);
+      patch((prev) => {
+        const found = allRecommendations.find((r) => r.id === id);
+        const updated = found ? { ...found, status } : ({ id, status } as any);
+        const nextRecs = prev.recommendations.some((r) => r.id === id)
+          ? prev.recommendations.map((r) => (r.id === id ? { ...r, status } : r))
+          : [...prev.recommendations, updated];
+        return {
+          ...prev,
+          recommendations: nextRecs,
+          activity:
+            status === "completed" && rec
+              ? [
+                  {
+                    id: newActivityId(),
+                    type: "recommendation-completed" as const,
+                    message: `Completed: ${rec.title}`,
+                    at: new Date().toISOString(),
+                    farmId: rec.farmId,
+                    cropId: rec.cropId,
+                  },
+                  ...prev.activity,
+                ].slice(0, 40)
+              : prev.activity,
+        };
+      });
       await api.setRecommendationStatus(id, status);
       toast({
         tone: status === "completed" ? "success" : "info",
@@ -815,15 +916,20 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         description: rec?.title,
       });
     },
-    [patch, snapshot.recommendations, toast]
+    [patch, allRecommendations, toast]
   );
 
   const updateSettings = useCallback<StoreValue["updateSettings"]>(
     async (next) => {
       const merged = { ...snapshot.settings, ...next };
       patch((prev) => ({ ...prev, settings: merged }));
-      await api.saveSettings(merged);
-      toast({ tone: "success", title: "Preferences saved", description: "Stored locally for this demo." });
+      try {
+        await api.saveSettings(merged);
+        toast({ tone: "success", title: "Preferences saved", description: "Your preferences were updated." });
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Failed to save preferences";
+        toast({ tone: "error", title: "Save failed", description: msg });
+      }
     },
     [patch, snapshot.settings, toast]
   );
@@ -831,8 +937,16 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const updateProfile = useCallback<StoreValue["updateProfile"]>(
     async (next) => {
       patch((prev) => ({ ...prev, user: { ...prev.user, ...next } }));
-      await new Promise((r) => setTimeout(r, 260));
-      toast({ tone: "success", title: "Profile updated", description: next.fullName ?? undefined });
+      try {
+        const res = await api.updateProfile(next);
+        if (res?.user?.name) {
+          patch((prev) => ({ ...prev, user: { ...prev.user, fullName: res.user.name, name: res.user.name } }));
+        }
+        toast({ tone: "success", title: "Profile updated", description: next.fullName ?? undefined });
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Failed to update profile";
+        toast({ tone: "error", title: "Update failed", description: msg });
+      }
     },
     [patch, toast]
   );
@@ -948,7 +1062,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       setShowOnboarding,
       farms: snapshot.farms,
       crops: snapshot.crops,
-      recommendations: snapshot.recommendations,
+      recommendations: allRecommendations,
       activity: snapshot.activity,
       settings: snapshot.settings,
       weather: mergedWeather,
@@ -988,6 +1102,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       loadError,
       load,
       snapshot,
+      allRecommendations,
       showOnboarding,
       mergedWeather,
       weatherLoading,

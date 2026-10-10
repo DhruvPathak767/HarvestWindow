@@ -12,15 +12,19 @@ import { relativeTime } from "@/utils/date";
 import { EmptyState } from "@/components/common/ui";
 import { cn } from "@/utils/cn";
 
-const ICONS: Record<ActivityType, { icon: typeof RefreshCw; tone: string }> = {
+const ICONS: Record<string, { icon: typeof RefreshCw; tone: string }> = {
   "crop-added": { icon: PlusCircle, tone: "bg-soft text-forest" },
+  "crop-planted": { icon: PlusCircle, tone: "bg-soft text-forest" },
   "farm-added": { icon: Tractor, tone: "bg-[#f2e9e2] text-earth" },
+  "farm-created": { icon: Tractor, tone: "bg-[#f2e9e2] text-earth" },
   "farm-updated": { icon: SlidersHorizontal, tone: "bg-[#f2e9e2] text-earth" },
   "forecast-refreshed": { icon: RefreshCw, tone: "bg-[#e6eef4] text-info" },
   "window-changed": { icon: SlidersHorizontal, tone: "bg-gold-soft/70 text-[#8a6415]" },
   "recommendation-generated": { icon: ListChecks, tone: "bg-soft text-forest" },
   "recommendation-completed": { icon: CheckCircle2, tone: "bg-[#eaf1e2] text-living" },
 };
+
+const DEFAULT_META = { icon: RefreshCw, tone: "bg-soft text-forest" };
 
 export function ActivityFeed({
   events,
@@ -46,8 +50,9 @@ export function ActivityFeed({
   return (
     <ol className={cn("flex flex-col", className)}>
       {visible.map((event, i) => {
-        const meta = ICONS[event.type];
+        const meta = ICONS[event.type] ?? DEFAULT_META;
         const Icon = meta.icon;
+        const timeStr = event.at || (event as any).timestamp;
         return (
           <motion.li
             key={event.id}
@@ -67,7 +72,7 @@ export function ActivityFeed({
             <div className="min-w-0 flex-1">
               <p className="text-[13px] leading-snug text-ink">{event.message}</p>
               <p className="mt-1 font-mono text-[10.5px] tracking-wide text-muted uppercase">
-                {relativeTime(event.at)}
+                {timeStr ? relativeTime(timeStr) : "recently"}
               </p>
             </div>
           </motion.li>

@@ -181,6 +181,82 @@ const nextId = (prefix: string) =>
   `${prefix}-${Date.now().toString(36)}-${(idCounter++).toString(36)}`;
 
 /** Contract shared by demo implementation and live HTTP client. */
+export interface DashboardData {
+  overview: {
+    totalFarms: number;
+    totalTrackedArea: number;
+    totalActiveCrops: number;
+    approachingHarvest: number;
+    readyForHarvest: number;
+    overdueHarvests: number;
+  };
+  cropStatusDistribution: { stage: string; count: number; label?: string }[];
+  readinessDistribution: { status: string; label: string; count: number }[];
+  upcomingHarvests: Array<{
+    cropId: string;
+    cropName: string;
+    variety: string | null;
+    cropVariety?: string | null;
+    farmId: string;
+    farmName: string;
+    district: string;
+    sowingDate: string | null;
+    harvestWindow: { startDate: string | null; typicalDate: string | null; endDate: string | null };
+    estimatedWindowStart?: string | null;
+    estimatedWindowEnd?: string | null;
+    baselineHarvestWindow?: { startDate: string | null; typicalDate: string | null; endDate: string | null };
+    adjustedHarvestWindow?: { startDate: string | null; typicalDate: string | null; endDate: string | null } | null;
+    readinessStatus: string;
+    readinessLevel: string;
+    confidenceScore: number;
+    confidenceLevel: string;
+    daysToWindowStart: number;
+    daysToWindowEnd: number;
+    daysUntilHarvest: number;
+    daysRemaining?: number | null;
+    actionableAdvice?: string | null;
+    weatherAdjustmentStatus: string;
+    weatherAdjustmentApplied: boolean;
+    weatherAdjustmentDays?: number;
+  }>;
+  recentActivity: Array<{
+    id: string;
+    type: string;
+    message: string;
+    at?: string;
+    timestamp?: string;
+    farmId?: string | null;
+    cropId?: string | null;
+  }>;
+  forecastSummary: {
+    totalForecasts: number;
+    weatherAdjustedCount: number;
+    baselineOnlyCount: number;
+    nextUpcomingDate: string | null;
+  };
+}
+
+export interface SettingsData {
+  profile: {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    createdAt: string;
+  };
+  preferences: {
+    areaUnit: "hectare" | "acre";
+    temperatureUnit: "celsius" | "fahrenheit";
+    language: "en" | "hi" | "kn" | "ta";
+    defaultFarmId: string | null;
+    notifications: {
+      harvestWindowAlerts: boolean;
+      weatherCautions: boolean;
+      weeklySummary: boolean;
+    };
+  };
+}
+
 export interface HarvestWindowApi {
   loadSnapshot(userEmailOrId?: string | null): Promise<PersistedSnapshot>;
   listFarms(): Promise<Farm[]>;
@@ -214,12 +290,17 @@ export interface HarvestWindowApi {
     failed: number;
     forecasts: Forecast[];
   }>;
+  getDashboard(): Promise<DashboardData>;
+  getSettings(): Promise<SettingsData>;
+  saveSettings(settings: AppSettings): Promise<AppSettings>;
+  updateProfile(input: { fullName?: string; name?: string }): Promise<{ user: any }>;
   setRecommendationStatus(
     id: string,
     status: RecommendationStatus
   ): Promise<{ id: string; status: RecommendationStatus }>;
-  saveSettings(settings: AppSettings): Promise<AppSettings>;
   resetDemoData(): Promise<PersistedSnapshot>;
+  getFarmWeather(farmId: string, refresh?: boolean): Promise<any>;
+  getCurrentLocationWeather(latitude: number, longitude: number): Promise<any>;
 }
 
 function normalizeForecast(raw: any): Forecast {
@@ -780,9 +861,185 @@ export const api: HarvestWindowApi = {
     return { id, status };
   },
 
+  async getDashboard() {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const res = await apiRequest<{ success: boolean; data: DashboardData }>("/dashboard");
+        if (res?.data) return res.data;
+      } catch (err) {
+        console.warn("[HarvestWindow API] Live getDashboard failed, falling back to local computation:", err);
+      }
+    }
+
+    await wait(200);
+    const snap = localStore.load() ?? buildSeedSnapshot();
+    const weather: Record<string, ReturnType<typeof weatherService.snapshotForFarm>> = {};
+    for (const f of snap.farms) weather[f.id] = weatherService.snapshotForFarm(f);
+    const forecasts = computeForecasts(snap.crops, weather);
+
+    let totalTrackedArea = 0;
+    for (const f of snap.farms) totalTrackedArea += f.area || 0;
+
+    const activeCrops = snap.crops.filter((c) => (c.growthStage || "").toLowerCase() !== "harvested");
+    let approaching = 0;
+    let ready = 0;
+    let overdue = 0;
+    for (const c of activeCrops) {
+      const fc = forecasts[c.id];
+      if (!fc) continue;
+      if (fc.readinessStatus === "approaching") approaching++;
+      else if (fc.readinessStatus === "in-window") ready++;
+      else if (fc.readinessStatus === "passed") overdue++;
+    }
+
+    const upcoming = Object.values(forecasts)
+      .filter((fc) => fc.daysToWindowStart >= 0 || fc.daysToWindowEnd >= 0)
+      .sort((a, b) => a.daysToWindowStart - b.daysToWindowStart)
+      .map((fc) => {
+        const crop = snap.crops.find((c) => c.id === fc.cropId);
+        const farm = snap.farms.find((f) => f.id === crop?.farmId);
+        return {
+          cropId: fc.cropId,
+          cropName: crop?.name || "Unknown",
+          variety: crop?.variety || null,
+          farmId: farm?.id || "",
+          farmName: farm?.name || "",
+          district: farm?.district || "",
+          sowingDate: crop?.plantingDate || null,
+          harvestWindow: { startDate: fc.estimatedWindowStart, typicalDate: fc.estimatedWindowStart, endDate: fc.estimatedWindowEnd },
+          readinessStatus: fc.readinessStatus,
+          readinessLevel: fc.readinessStatus.toUpperCase(),
+          confidenceScore: fc.confidence || 75,
+          confidenceLevel: "MEDIUM",
+          daysToWindowStart: fc.daysToWindowStart,
+          daysToWindowEnd: fc.daysToWindowEnd,
+          daysUntilHarvest: fc.daysToWindowStart,
+          weatherAdjustmentStatus: "UNAVAILABLE",
+          weatherAdjustmentApplied: false,
+        };
+      });
+
+    return {
+      overview: {
+        totalFarms: snap.farms.length,
+        totalTrackedArea: Math.round(totalTrackedArea * 10) / 10,
+        totalActiveCrops: activeCrops.length,
+        approachingHarvest: approaching,
+        readyForHarvest: ready,
+        overdueHarvests: overdue,
+      },
+      cropStatusDistribution: [] as { stage: string; count: number; label?: string }[],
+      readinessDistribution: [
+        { status: "growing", label: "Developing", count: activeCrops.length - approaching - ready - overdue },
+        { status: "approaching", label: "Approaching", count: approaching },
+        { status: "in-window", label: "Ready (In Window)", count: ready },
+        { status: "passed", label: "Harvest Window Passed", count: overdue },
+      ],
+      upcomingHarvests: upcoming,
+      recentActivity: (snap.activity || []).map((a) => ({
+        id: a.id,
+        type: a.type,
+        message: a.message,
+        timestamp: a.at,
+        at: a.at,
+        farmId: a.farmId || null,
+        cropId: a.cropId || null,
+      })),
+      forecastSummary: {
+        totalForecasts: Object.keys(forecasts).length,
+        weatherAdjustedCount: 0,
+        baselineOnlyCount: Object.keys(forecasts).length,
+        nextUpcomingDate: upcoming[0]?.harvestWindow.startDate || null,
+      },
+    };
+  },
+
+  async getSettings() {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const res = await apiRequest<{ success: boolean; data: SettingsData }>("/settings");
+        if (res?.data) return res.data;
+      } catch (err) {
+        console.warn("[HarvestWindow API] Live getSettings failed:", err);
+      }
+    }
+
+    const snap = localStore.load() ?? buildSeedSnapshot();
+    return {
+      profile: {
+        id: snap.user?.id || "demo-user",
+        name: snap.user?.fullName || "Farm Manager",
+        email: snap.user?.email || "demo@harvestwindow.local",
+        role: snap.user?.role || "FARMER",
+        createdAt: new Date().toISOString(),
+      },
+      preferences: {
+        areaUnit: snap.settings?.areaUnit || "hectare",
+        temperatureUnit: "celsius",
+        language: snap.settings?.language || "en",
+        defaultFarmId: snap.settings?.defaultFarmId || null,
+        notifications: snap.settings?.notifications || {
+          harvestWindowAlerts: true,
+          weatherCautions: true,
+          weeklySummary: false,
+        },
+      },
+    };
+  },
+
   async saveSettings(settings) {
-    await wait(260);
+    if (API_CONFIG.mode === "live") {
+      try {
+        const res = await apiRequest<{ success: boolean; data: SettingsData }>("/settings", {
+          method: "PATCH",
+          body: JSON.stringify({
+            areaUnit: settings.areaUnit,
+            language: settings.language,
+            defaultFarmId: settings.defaultFarmId,
+            notifications: settings.notifications,
+          }),
+        });
+        if (res?.data?.preferences) {
+          const snap = localStore.load() ?? buildSeedSnapshot();
+          snap.settings = { ...snap.settings, ...settings };
+          localStore.save(snap);
+          return settings;
+        }
+      } catch (err) {
+        console.warn("[HarvestWindow API] Live saveSettings failed, updating local store:", err);
+      }
+    }
+
+    await wait(200);
+    const snap = localStore.load() ?? buildSeedSnapshot();
+    snap.settings = { ...snap.settings, ...settings };
+    localStore.save(snap);
     return settings;
+  },
+
+  async updateProfile(input) {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const res = await apiRequest<{ success: boolean; data: { user: any } }>("/users/profile", {
+          method: "PATCH",
+          body: JSON.stringify({ name: input.fullName || input.name }),
+        });
+        if (res?.data?.user) {
+          const snap = localStore.load() ?? buildSeedSnapshot();
+          snap.user = { ...snap.user, fullName: res.data.user.name, name: res.data.user.name };
+          localStore.save(snap);
+          return res.data;
+        }
+      } catch (err) {
+        console.warn("[HarvestWindow API] Live updateProfile failed:", err);
+      }
+    }
+
+    await wait(200);
+    const snap = localStore.load() ?? buildSeedSnapshot();
+    snap.user = { ...snap.user, fullName: input.fullName || input.name || snap.user.fullName };
+    localStore.save(snap);
+    return { user: snap.user };
   },
 
   async resetDemoData() {

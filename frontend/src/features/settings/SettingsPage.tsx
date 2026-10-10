@@ -193,6 +193,24 @@ export default function SettingsPage() {
                 hint="The workspace opens focused on this farm."
               />
 
+              <div className="flex flex-col gap-1.5">
+                <span className="font-display text-[12.5px] font-semibold text-forest-deep">
+                  Temperature display unit
+                </span>
+                <SegmentedControl<"c" | "f">
+                  ariaLabel="Default temperature unit"
+                  value={settings.temperatureUnit ?? "c"}
+                  onChange={(v) => patchSettings({ temperatureUnit: v })}
+                  options={[
+                    { value: "c", label: "Celsius (°C)" },
+                    { value: "f", label: "Fahrenheit (°F)" },
+                  ]}
+                />
+                <p className="text-[12px] text-muted">
+                  Used across weather views and dashboard weather strip.
+                </p>
+              </div>
+
               <SelectField
                 label="Interface language & date format"
                 value={settings.language}
