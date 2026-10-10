@@ -39,7 +39,7 @@ import {
 import { DEFAULT_SETTINGS, DEMO_CREDENTIALS, DEMO_USER } from "@/data/mock/seed";
 import { setLocale } from "@/utils/date";
 import { useToast } from "@/components/feedback/ToastProvider";
-import { authClient } from "@/services/api/authClient";
+import { authClient, type AuthUser } from "@/services/api/authClient";
 
 export const ALL_FARMS = "all" as const;
 export type FarmSelection = string | typeof ALL_FARMS;
@@ -156,7 +156,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     setLoadError(null);
     try {
       // 1. Restore authentication from server state rather than trusting local storage
-      let authUser: { id: string; name: string; email: string; role: Role } | null = null;
+      let authUser: AuthUser | null = null;
       try {
         const authResult = await authClient.getMe();
         if (authResult?.user) {
@@ -678,7 +678,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         toast({ tone: "info", title: "Crop record removed" });
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : "Failed to delete crop";
-        toast({ tone: "danger", title: "Delete failed", description: msg });
+        toast({ tone: "error", title: "Delete failed", description: msg });
         throw err;
       }
     },

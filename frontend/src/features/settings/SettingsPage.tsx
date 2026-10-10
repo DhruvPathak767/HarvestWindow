@@ -41,8 +41,7 @@ export default function SettingsPage() {
   const { toast } = useToast();
 
   const [name, setName] = useState(user.fullName);
-  const [email, setEmail] = useState(user.email);
-  const [role, setRole] = useState(user.role);
+  const email = user.email;
   const [savingProfile, setSavingProfile] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
 

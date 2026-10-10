@@ -66,7 +66,7 @@ const EMPTY_DRAFT: OnboardingDraft = {
 };
 
 export function OnboardingFlow({ open }: { open: boolean }) {
-  const { setShowOnboarding, completeOnboarding, dismissOnboarding } = useStore();
+  const { completeOnboarding, dismissOnboarding } = useStore();
   const reduced = useReducedMotion();
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<OnboardingDraft>(EMPTY_DRAFT);
@@ -133,7 +133,7 @@ export function OnboardingFlow({ open }: { open: boolean }) {
       longitude: draft.longitude ?? null,
       area: draft.area || 1,
       areaUnit: draft.areaUnit,
-      notes: draft.notes || null,
+      notes: draft.notes || undefined,
       createdAt: new Date().toISOString(),
     };
     const isRainfed = draft.irrigationSource?.toLowerCase().includes("rainfed");

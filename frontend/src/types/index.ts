@@ -155,6 +155,7 @@ export interface Recommendation {
 export type ActivityType =
   | "crop-added"
   | "farm-added"
+  | "farm-updated"
   | "forecast-refreshed"
   | "window-changed"
   | "recommendation-generated"

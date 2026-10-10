@@ -15,6 +15,7 @@ import { cn } from "@/utils/cn";
 const ICONS: Record<ActivityType, { icon: typeof RefreshCw; tone: string }> = {
   "crop-added": { icon: PlusCircle, tone: "bg-soft text-forest" },
   "farm-added": { icon: Tractor, tone: "bg-[#f2e9e2] text-earth" },
+  "farm-updated": { icon: SlidersHorizontal, tone: "bg-[#f2e9e2] text-earth" },
   "forecast-refreshed": { icon: RefreshCw, tone: "bg-[#e6eef4] text-info" },
   "window-changed": { icon: SlidersHorizontal, tone: "bg-gold-soft/70 text-[#8a6415]" },
   "recommendation-generated": { icon: ListChecks, tone: "bg-soft text-forest" },
