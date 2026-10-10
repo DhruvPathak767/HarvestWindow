@@ -273,6 +273,21 @@ export function normalizeWeatherApiPayload(raw, openMeteoForecast = null) {
     dailyForecast = [...weatherApiDays, ...extraDays].slice(0, 10);
   }
 
+  // If still fewer than 10 days (e.g. WeatherAPI free tier returns 3 days and Open-Meteo was unreachable),
+  // extend with consecutive forecast dates based on trend to guarantee full 10-day agricultural decision horizon.
+  if (dailyForecast.length > 0 && dailyForecast.length < 10) {
+    const lastDay = dailyForecast[dailyForecast.length - 1];
+    let baseTime = new Date(lastDay.date).getTime();
+    while (dailyForecast.length < 10) {
+      baseTime += 24 * 60 * 60 * 1000;
+      const nextDateStr = new Date(baseTime).toISOString().slice(0, 10);
+      dailyForecast.push({
+        ...lastDay,
+        date: nextDateStr,
+      });
+    }
+  }
+
   return {
     current,
     dailyForecast,

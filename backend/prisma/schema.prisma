@@ -32,6 +32,7 @@ model User {
   updatedAt       DateTime         @updatedAt
   refreshSessions RefreshSession[]
   farms           Farm[]
+  recommendations Recommendation[]
 
   @@index([role])
   @@map("users")
@@ -75,6 +76,7 @@ model Farm {
 
   user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   crops            Crop[]
+  recommendations  Recommendation[]
 
   @@index([userId])
   @@map("farms")
@@ -97,10 +99,43 @@ model Crop {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
-  farm                Farm      @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  farm                Farm             @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  recommendations     Recommendation[]
 
   @@index([farmId])
   @@index([cropName])
   @@index([growthStage])
   @@map("crops")
 }
+
+// Recommendation model for Phase 6 Recommendation Engine
+model Recommendation {
+  id              String    @id @default(cuid())
+  userId          String    @db.VarChar(191)
+  farmId          String?   @db.VarChar(191)
+  cropId          String?   @db.VarChar(191)
+  ruleKey         String    @db.VarChar(120)
+  title           String    @db.VarChar(255)
+  reason          String    @db.Text
+  suggestedAction String    @db.Text
+  category        String    @db.VarChar(50) // "weather" | "timing" | "logistics" | "monitoring"
+  priority        String    @db.VarChar(20) // "low" | "medium" | "high"
+  status          String    @default("open") @db.VarChar(20) // "open" | "completed" | "dismissed"
+  relevantDate    DateTime?
+  sourceContext   String?   @db.Text
+  completedAt     DateTime?
+  dismissedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  farm            Farm?     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  crop            Crop?     @relation(fields: [cropId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([userId, ruleKey])
+  @@index([farmId])
+  @@index([cropId])
+  @@map("recommendations")
+}
+

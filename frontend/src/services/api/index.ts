@@ -198,7 +198,16 @@ export interface HarvestWindowApi {
     id: string,
     input: UpdateCropInput
   ): Promise<{ crop: Crop; activity: ActivityEvent }>;
-  deleteCrop(id: string): Promise<{ id: string; activity: ActivityEvent }>;
+  listRecommendations(params?: {
+    status?: string;
+    priority?: string;
+    category?: string;
+    farmId?: string;
+    cropId?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{ items: Recommendation[]; pagination: any }>;
+  refreshRecommendations(farmId?: string): Promise<{ created: number; updated: number; retained: number; skipped: number; total: number }>;
   setRecommendationStatus(
     id: string,
     status: RecommendationStatus
@@ -233,10 +242,40 @@ export const api: HarvestWindowApi = {
               ? baseSnapshot.crops
               : baseSnapshot.crops.filter((c) => farmIdSet.has(c.farmId));
 
+        let liveRecs: Recommendation[] = [];
+        try {
+          const recRes = await this.listRecommendations({ limit: 100 });
+          if (recRes && Array.isArray(recRes.items)) {
+            liveRecs = recRes.items;
+          }
+          // If a live user has crops but 0 recommendations, trigger initial refresh
+          if (!isDemo && cropsToUse.length > 0 && liveRecs.length === 0) {
+            try {
+              await this.refreshRecommendations();
+              const refreshed = await this.listRecommendations({ limit: 100 });
+              if (refreshed && Array.isArray(refreshed.items)) {
+                liveRecs = refreshed.items;
+              }
+            } catch {
+              /* ignore refresh on load error */
+            }
+          }
+        } catch (recErr) {
+          console.warn("[HarvestWindow API] Unable to fetch live recommendations during snapshot load:", recErr);
+        }
+
+        const recsToUse =
+          Array.isArray(liveRecs) && liveRecs.length > 0
+            ? liveRecs
+            : isDemo
+              ? baseSnapshot.recommendations
+              : baseSnapshot.recommendations.filter((r) => farmIdSet.has(r.farmId));
+
         return {
           ...baseSnapshot,
           farms: farmsToUse,
           crops: cropsToUse,
+          recommendations: recsToUse,
         };
       } catch (err) {
         console.warn(
@@ -636,7 +675,71 @@ export const api: HarvestWindowApi = {
     };
   },
 
+  async listRecommendations(params?: {
+    status?: string;
+    priority?: string;
+    category?: string;
+    farmId?: string;
+    cropId?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const queryParams = new URLSearchParams();
+        if (params?.status) queryParams.set("status", params.status);
+        if (params?.priority) queryParams.set("priority", params.priority);
+        if (params?.category) queryParams.set("category", params.category);
+        if (params?.farmId) queryParams.set("farmId", params.farmId);
+        if (params?.cropId) queryParams.set("cropId", params.cropId);
+        if (params?.page) queryParams.set("page", String(params.page));
+        if (params?.limit) queryParams.set("limit", String(params.limit));
+
+        const queryString = queryParams.toString() ? `?${queryParams.toString()}` : "";
+        const res = await apiRequest<{
+          success: boolean;
+          data: { items: Recommendation[]; pagination: any };
+        }>(`/recommendations${queryString}`);
+
+        return res.data;
+      } catch (err) {
+        console.warn("[HarvestWindow API] Unable to list live recommendations, falling back to local:", err);
+      }
+    }
+    await wait(180);
+    return { items: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } };
+  },
+
+  async refreshRecommendations(farmId?: string) {
+    if (API_CONFIG.mode === "live") {
+      const res = await apiRequest<{
+        success: boolean;
+        data: { created: number; updated: number; retained: number; skipped: number; total: number };
+      }>("/recommendations/refresh", {
+        method: "POST",
+        body: JSON.stringify(farmId ? { farmId } : {}),
+      });
+      return res.data;
+    }
+    await wait(250);
+    return { created: 0, updated: 0, retained: 0, skipped: 0, total: 0 };
+  },
+
   async setRecommendationStatus(id, status) {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const res = await apiRequest<{
+          success: boolean;
+          data: Recommendation;
+        }>(`/recommendations/${id}/status`, {
+          method: "PATCH",
+          body: JSON.stringify({ status }),
+        });
+        return { id: res.data.id, status: res.data.status };
+      } catch (err) {
+        console.warn("[HarvestWindow API] Live update recommendation status failed, using optimistic state:", err);
+      }
+    }
     await wait(220);
     return { id, status };
   },

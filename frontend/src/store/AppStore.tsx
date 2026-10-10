@@ -121,6 +121,7 @@ interface StoreValue {
   removeCrop: (cropId: string) => Promise<void>;
   fetchCrop: (cropId: string) => Promise<Crop | null>;
   refreshCrops: (farmId?: string) => Promise<Crop[]>;
+  refreshRecommendations: (farmId?: string) => Promise<void>;
   setRecommendationStatus: (id: string, status: RecommendationStatus) => Promise<void>;
   updateSettings: (patch: Partial<AppSettings>) => Promise<void>;
   updateProfile: (patch: Partial<UserProfile>) => Promise<void>;
@@ -308,10 +309,39 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           ? userSnapshot.crops
           : userSnapshot.crops.filter((c) => farmIdSet.has(c.farmId));
 
+        let liveRecs: Recommendation[] = [];
+        try {
+          const recRes = await api.listRecommendations({ limit: 100 });
+          if (recRes && Array.isArray(recRes.items)) {
+            liveRecs = recRes.items;
+          }
+          if (!isDemo && validCrops.length > 0 && liveRecs.length === 0) {
+            try {
+              await api.refreshRecommendations();
+              const refreshed = await api.listRecommendations({ limit: 100 });
+              if (refreshed && Array.isArray(refreshed.items)) {
+                liveRecs = refreshed.items;
+              }
+            } catch {
+              /* ignore auto-refresh error */
+            }
+          }
+        } catch (recErr) {
+          console.warn("[AppStore] Could not fetch live recommendations on sign-in:", recErr);
+        }
+
+        const validRecs =
+          Array.isArray(liveRecs) && liveRecs.length > 0
+            ? liveRecs
+            : isDemo
+              ? userSnapshot.recommendations
+              : userSnapshot.recommendations.filter((r) => farmIdSet.has(r.farmId));
+
         const updatedSnapshot: PersistedSnapshot = {
           ...userSnapshot,
           farms: liveFarms,
           crops: validCrops,
+          recommendations: validRecs,
           signedIn: true,
           user: {
             fullName: result.user.name,
@@ -727,9 +757,39 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     [patch]
   );
 
+  const refreshRecommendations = useCallback<StoreValue["refreshRecommendations"]>(
+    async (farmId) => {
+      try {
+        await api.refreshRecommendations(farmId);
+        const res = await api.listRecommendations(farmId ? { farmId, limit: 100 } : { limit: 100 });
+        if (res && Array.isArray(res.items)) {
+          patch((prev) => ({
+            ...prev,
+            recommendations: res.items,
+          }));
+          toast({
+            tone: "success",
+            title: "Recommendations updated",
+            description: "Fresh guidance calculated based on current crops, weather, and farm data.",
+          });
+        }
+      } catch (err) {
+        console.error("[AppStore] Failed to refresh recommendations:", err);
+        toast({
+          tone: "caution",
+          title: "Refresh failed",
+          description: "Could not generate fresh recommendations from the server.",
+        });
+      }
+    },
+    [patch, toast]
+  );
+
   const setRecommendationStatus = useCallback<StoreValue["setRecommendationStatus"]>(
     async (id, status) => {
       const rec = snapshot.recommendations.find((r) => r.id === id);
+      const previousStatus = rec?.status;
+
       patch((prev) => ({
         ...prev,
         recommendations: prev.recommendations.map((r) =>
@@ -750,17 +810,34 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
               ].slice(0, 40)
             : prev.activity,
       }));
-      await api.setRecommendationStatus(id, status);
-      toast({
-        tone: status === "completed" ? "success" : "info",
-        title:
-          status === "completed"
-            ? "Marked as completed"
-            : status === "dismissed"
-              ? "Recommendation dismissed"
-              : "Recommendation reopened",
-        description: rec?.title,
-      });
+
+      try {
+        await api.setRecommendationStatus(id, status);
+        toast({
+          tone: status === "completed" ? "success" : "info",
+          title:
+            status === "completed"
+              ? "Marked as completed"
+              : status === "dismissed"
+                ? "Recommendation dismissed"
+                : "Recommendation reopened",
+          description: rec?.title,
+        });
+      } catch (err) {
+        if (previousStatus) {
+          patch((prev) => ({
+            ...prev,
+            recommendations: prev.recommendations.map((r) =>
+              r.id === id ? { ...r, status: previousStatus } : r
+            ),
+          }));
+        }
+        toast({
+          tone: "caution",
+          title: "Status update failed",
+          description: "Could not update recommendation status on the server.",
+        });
+      }
     },
     [patch, snapshot.recommendations, toast]
   );
@@ -900,6 +977,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       removeCrop,
       fetchCrop,
       refreshCrops,
+      refreshRecommendations,
       setRecommendationStatus,
       updateSettings,
       updateProfile,
@@ -936,6 +1014,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       removeCrop,
       fetchCrop,
       refreshCrops,
+      refreshRecommendations,
       setRecommendationStatus,
       updateSettings,
       refreshForecasts,

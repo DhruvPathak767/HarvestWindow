@@ -10,6 +10,7 @@ import usersRoutes from "./modules/users/users.routes.js";
 import farmRoutes from "./modules/farms/farms.routes.js";
 import cropRoutes from "./modules/crops/crops.routes.js";
 import weatherRoutes from "./modules/weather/weather.routes.js";
+import recommendationRoutes from "./modules/recommendations/recommendations.routes.js";
 
 export const app = express();
 
@@ -86,6 +87,9 @@ app.use("/api/crops", cropRoutes);
 
 app.use("/api/v1/weather", weatherRoutes);
 app.use("/api/weather", weatherRoutes);
+
+app.use("/api/v1/recommendations", recommendationRoutes);
+app.use("/api/recommendations", recommendationRoutes);
 
 // 404 Handler & Centralized Error Handler
 app.use(notFoundHandler);
