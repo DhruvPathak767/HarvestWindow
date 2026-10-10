@@ -11,6 +11,7 @@ import {
   Leaf,
   ListChecks,
   MapPin,
+  Pencil,
   Sprout,
   Trash2,
 } from "lucide-react";
@@ -24,6 +25,7 @@ import { WeatherChart } from "@/components/charts/WeatherChart";
 import { RecommendationCard } from "@/features/recommendations/RecommendationCard";
 import { CROP_IMAGES, findCatalogEntry } from "@/data/mock/cropCatalog";
 import { useStore } from "@/store/AppStore";
+import { EditCropModal } from "./EditCropModal";
 import { weatherService, CONDITION_LABEL } from "@/services/weather/weatherService";
 import { daysLabel, formatDate, formatTime, relativeTime } from "@/utils/date";
 import { cn } from "@/utils/cn";
@@ -42,6 +44,8 @@ export default function CropDetailPage() {
     setRecommendationStatus,
   } = useStore();
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [removing, setRemoving] = useState(false);
 
   const crop = crops.find((c) => c.id === cropId) ?? null;
 
@@ -128,6 +132,15 @@ export default function CropDetailPage() {
         actions={
           <>
             <StatusBadge status={forecast.readinessStatus} full />
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => setEditOpen(true)}
+              aria-label={`Edit ${crop.name} details`}
+            >
+              <Pencil className="h-3.5 w-3.5" aria-hidden />
+              Edit
+            </Button>
             <Button
               size="sm"
               variant="danger"
@@ -437,7 +450,7 @@ export default function CropDetailPage() {
         open={confirmRemove}
         onClose={() => setConfirmRemove(false)}
         title={`Remove ${crop.name}?`}
-        description="The crop record and its recommendations are removed from this browser's demo data. This cannot be undone without resetting the demo dataset."
+        description="The crop record and its associated data will be removed from the workspace. This action cannot be undone."
         size="sm"
         footer={
           <>
@@ -447,10 +460,16 @@ export default function CropDetailPage() {
             <Button
               variant="danger"
               size="sm"
-              onClick={() => {
-                removeCrop(crop.id);
-                setConfirmRemove(false);
-                navigate(farm ? `/app/farms/${farm.id}` : "/app");
+              loading={removing}
+              onClick={async () => {
+                setRemoving(true);
+                try {
+                  await removeCrop(crop.id);
+                  setConfirmRemove(false);
+                  navigate(farm ? `/app/farms/${farm.id}` : "/app");
+                } catch {
+                  setRemoving(false);
+                }
               }}
             >
               <Trash2 className="h-3.5 w-3.5" aria-hidden />
@@ -464,6 +483,12 @@ export default function CropDetailPage() {
           {formatDate(forecast.estimatedWindowStart)} to {formatDate(forecast.estimatedWindowEnd)}.
         </p>
       </Modal>
+
+      <EditCropModal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        crop={crop}
+      />
     </div>
   );
 }

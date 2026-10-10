@@ -59,6 +59,7 @@ export function AddCropModal({
 }) {
   const { farms, addCrop, selectedFarmId } = useStore();
   const [submitting, setSubmitting] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
 
   const initialFarm =
     defaultFarmId ??
@@ -100,6 +101,7 @@ export function AddCropModal({
 
   const onSubmit = async (values: FormValues) => {
     setSubmitting(true);
+    setServerError(null);
     try {
       const extra =
         values.harvestType === "multiple"
@@ -121,6 +123,9 @@ export function AddCropModal({
       onCreated?.(crop.id);
       reset();
       onClose();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to create crop";
+      setServerError(msg);
     } finally {
       setSubmitting(false);
     }
@@ -150,6 +155,12 @@ export function AddCropModal({
         className="flex flex-col gap-4"
         noValidate
       >
+        {serverError && (
+          <div className="rounded-md border border-caution/40 bg-caution/10 px-3.5 py-2.5 text-[12.5px] font-medium text-caution">
+            {serverError}
+          </div>
+        )}
+
         <div className="grid gap-4 sm:grid-cols-2">
           <Controller
             control={control}

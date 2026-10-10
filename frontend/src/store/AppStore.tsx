@@ -26,6 +26,7 @@ import {
   newActivityId,
   setAuthToken,
   type NewCropInput,
+  type UpdateCropInput,
   type NewFarmInput,
   type UpdateFarmInput,
 } from "@/services/api";
@@ -101,7 +102,10 @@ interface StoreValue {
   fetchFarm: (id: string) => Promise<Farm | null>;
   refreshFarms: () => Promise<Farm[]>;
   addCrop: (input: NewCropInput) => Promise<Crop>;
-  removeCrop: (cropId: string) => void;
+  updateCrop: (id: string, input: UpdateCropInput) => Promise<Crop>;
+  removeCrop: (cropId: string) => Promise<void>;
+  fetchCrop: (cropId: string) => Promise<Crop | null>;
+  refreshCrops: (farmId?: string) => Promise<Crop[]>;
   setRecommendationStatus: (id: string, status: RecommendationStatus) => Promise<void>;
   updateSettings: (patch: Partial<AppSettings>) => Promise<void>;
   updateProfile: (patch: Partial<UserProfile>) => Promise<void>;
@@ -524,7 +528,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       const { crop, activity } = await api.createCrop(input);
       patch((prev) => ({
         ...prev,
-        crops: [...prev.crops, crop],
+        crops: [...prev.crops.filter((c) => c.id !== crop.id), crop],
         activity: [activity, ...prev.activity].slice(0, 40),
       }));
       toast({
@@ -537,27 +541,74 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     [patch, toast]
   );
 
-  const removeCrop = useCallback<StoreValue["removeCrop"]>(
-    (cropId) => {
-      const crop = snapshot.crops.find((c) => c.id === cropId);
+  const updateCrop = useCallback<StoreValue["updateCrop"]>(
+    async (id, input) => {
+      const { crop, activity } = await api.updateCrop(id, input);
       patch((prev) => ({
         ...prev,
-        crops: prev.crops.filter((c) => c.id !== cropId),
-        recommendations: prev.recommendations.filter((r) => r.cropId !== cropId),
-        activity: [
-          {
-            id: newActivityId(),
-            type: "crop-added" as const,
-            message: `${crop?.name ?? "A crop"} record removed from the plan`,
-            at: new Date().toISOString(),
-            farmId: crop?.farmId,
-          },
-          ...prev.activity,
-        ].slice(0, 40),
+        crops: prev.crops.map((c) => (c.id === id ? crop : c)),
+        activity: [activity, ...prev.activity].slice(0, 40),
       }));
-      toast({ tone: "info", title: "Crop record removed" });
+      toast({
+        tone: "success",
+        title: `${crop.name} updated`,
+        description: "Crop details and harvest timeline have been refreshed.",
+      });
+      return crop;
     },
-    [patch, snapshot.crops, toast]
+    [patch, toast]
+  );
+
+  const removeCrop = useCallback<StoreValue["removeCrop"]>(
+    async (cropId) => {
+      try {
+        const { activity } = await api.deleteCrop(cropId);
+        patch((prev) => ({
+          ...prev,
+          crops: prev.crops.filter((c) => c.id !== cropId),
+          recommendations: prev.recommendations.filter((r) => r.cropId !== cropId),
+          activity: [activity, ...prev.activity].slice(0, 40),
+        }));
+        toast({ tone: "info", title: "Crop record removed" });
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Failed to delete crop";
+        toast({ tone: "danger", title: "Delete failed", description: msg });
+        throw err;
+      }
+    },
+    [patch, toast]
+  );
+
+  const fetchCrop = useCallback<StoreValue["fetchCrop"]>(
+    async (cropId) => {
+      try {
+        const crop = await api.getCrop(cropId);
+        if (crop) {
+          patch((prev) => ({
+            ...prev,
+            crops: prev.crops.some((c) => c.id === crop.id)
+              ? prev.crops.map((c) => (c.id === crop.id ? crop : c))
+              : [...prev.crops, crop],
+          }));
+        }
+        return crop;
+      } catch {
+        return null;
+      }
+    },
+    [patch]
+  );
+
+  const refreshCrops = useCallback<StoreValue["refreshCrops"]>(
+    async (farmId) => {
+      const liveCrops = await api.listCrops(farmId ? { farmId } : undefined);
+      patch((prev) => ({
+        ...prev,
+        crops: liveCrops,
+      }));
+      return liveCrops;
+    },
+    [patch]
   );
 
   const setRecommendationStatus = useCallback<StoreValue["setRecommendationStatus"]>(
@@ -688,7 +739,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       fetchFarm,
       refreshFarms,
       addCrop,
+      updateCrop,
       removeCrop,
+      fetchCrop,
+      refreshCrops,
       setRecommendationStatus,
       updateSettings,
       updateProfile,
@@ -717,7 +771,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       fetchFarm,
       refreshFarms,
       addCrop,
+      updateCrop,
       removeCrop,
+      fetchCrop,
+      refreshCrops,
       setRecommendationStatus,
       updateSettings,
       refreshForecasts,

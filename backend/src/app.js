@@ -8,6 +8,7 @@ import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import authRoutes from "./modules/auth/auth.routes.js";
 import usersRoutes from "./modules/users/users.routes.js";
 import farmRoutes from "./modules/farms/farms.routes.js";
+import cropRoutes from "./modules/crops/crops.routes.js";
 
 export const app = express();
 
@@ -78,6 +79,9 @@ app.use("/api/users", usersRoutes);
 
 app.use("/api/v1/farms", farmRoutes);
 app.use("/api/farms", farmRoutes);
+
+app.use("/api/v1/crops", cropRoutes);
+app.use("/api/crops", cropRoutes);
 
 // 404 Handler & Centralized Error Handler
 app.use(notFoundHandler);

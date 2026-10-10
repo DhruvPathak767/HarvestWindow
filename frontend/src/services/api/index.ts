@@ -153,6 +153,23 @@ export interface NewCropInput {
   notes?: string;
 }
 
+export interface UpdateCropInput {
+  name?: string;
+  cropName?: string;
+  variety?: string;
+  farmId?: string;
+  plantingDate?: string;
+  sowingDate?: string;
+  expectedHarvestDate?: string;
+  growthStage?: string;
+  fieldArea?: number;
+  expectedYield?: string;
+  irrigation?: Crop["irrigation"];
+  irrigationMethod?: string;
+  irrigationFrequency?: string;
+  notes?: string;
+}
+
 let idCounter = 0;
 const nextId = (prefix: string) =>
   `${prefix}-${Date.now().toString(36)}-${(idCounter++).toString(36)}`;
@@ -168,7 +185,14 @@ export interface HarvestWindowApi {
     input: UpdateFarmInput
   ): Promise<{ farm: Farm; activity: ActivityEvent }>;
   deleteFarm(id: string): Promise<{ id: string; activity: ActivityEvent }>;
+  listCrops(params?: { farmId?: string; growthStage?: string }): Promise<Crop[]>;
+  getCrop(id: string): Promise<Crop>;
   createCrop(input: NewCropInput): Promise<{ crop: Crop; activity: ActivityEvent }>;
+  updateCrop(
+    id: string,
+    input: UpdateCropInput
+  ): Promise<{ crop: Crop; activity: ActivityEvent }>;
+  deleteCrop(id: string): Promise<{ id: string; activity: ActivityEvent }>;
   setRecommendationStatus(
     id: string,
     status: RecommendationStatus
@@ -184,13 +208,21 @@ export const api: HarvestWindowApi = {
     if (API_CONFIG.mode === "live") {
       try {
         const liveFarms = await this.listFarms();
-        if (Array.isArray(liveFarms) && liveFarms.length > 0) {
-          return {
-            ...baseSnapshot,
-            farms: liveFarms,
-          };
+        let liveCrops: Crop[] = [];
+        try {
+          liveCrops = await this.listCrops();
+        } catch (cropErr) {
+          console.warn("[HarvestWindow API] Unable to fetch live crops during snapshot load:", cropErr);
         }
-        return baseSnapshot;
+
+        const farmsToUse = Array.isArray(liveFarms) && liveFarms.length > 0 ? liveFarms : baseSnapshot.farms;
+        const cropsToUse = Array.isArray(liveCrops) && liveCrops.length > 0 ? liveCrops : baseSnapshot.crops;
+
+        return {
+          ...baseSnapshot,
+          farms: farmsToUse,
+          crops: cropsToUse,
+        };
       } catch (err) {
         console.warn(
           "[HarvestWindow API] Unable to fetch live farms during snapshot load, using cached demo data:",
@@ -384,7 +416,85 @@ export const api: HarvestWindowApi = {
     };
   },
 
+  async listCrops(params) {
+    if (API_CONFIG.mode === "live") {
+      try {
+        let endpoint = "/crops";
+        const queryParts: string[] = [];
+        if (params?.farmId) queryParts.push(`farmId=${encodeURIComponent(params.farmId)}`);
+        if (params?.growthStage) queryParts.push(`growthStage=${encodeURIComponent(params.growthStage)}`);
+        if (queryParts.length > 0) endpoint += `?${queryParts.join("&")}`;
+
+        const res = await apiRequest<{ success: boolean; data: Crop[] }>(endpoint);
+        return res.data;
+      } catch (err) {
+        console.warn("[HarvestWindow API] listCrops live request failed, using local store:", err);
+      }
+    }
+    const snap = localStore.load() ?? buildSeedSnapshot();
+    if (params?.farmId) {
+      return snap.crops.filter((c) => c.farmId === params.farmId);
+    }
+    return snap.crops;
+  },
+
+  async getCrop(id: string) {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const res = await apiRequest<{ success: boolean; data: Crop }>(`/crops/${id}`);
+        return res.data;
+      } catch (err) {
+        console.warn(`[HarvestWindow API] getCrop live request failed for ${id}, using local store:`, err);
+      }
+    }
+    const snap = localStore.load() ?? buildSeedSnapshot();
+    const crop = snap.crops.find((c) => c.id === id);
+    if (!crop) throw new Error("Crop not found");
+    return crop;
+  },
+
   async createCrop(input) {
+    if (API_CONFIG.mode === "live") {
+      const payload = {
+        farmId: input.farmId,
+        cropName: input.name,
+        name: input.name,
+        variety: input.variety?.trim() || null,
+        sowingDate: input.plantingDate,
+        plantingDate: input.plantingDate,
+        growthStage: input.growthStage?.trim() || null,
+        irrigationMethod: input.irrigation || null,
+        irrigation: input.irrigation || null,
+        fieldArea: input.fieldArea && input.fieldArea > 0 ? input.fieldArea : null,
+        expectedYield: input.expectedYield?.trim() || null,
+        notes: input.notes?.trim() || null,
+      };
+
+      const res = await apiRequest<{ success: boolean; data: Crop }>("/crops", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+
+      const crop = res.data;
+      const snap = localStore.load() ?? buildSeedSnapshot();
+      if (!snap.crops.some((c) => c.id === crop.id)) {
+        snap.crops.push(crop);
+        localStore.save(snap);
+      }
+
+      return {
+        crop,
+        activity: {
+          id: nextId("act"),
+          type: "crop-added",
+          message: `${crop.name}${crop.variety ? ` · ${crop.variety}` : ""} added to the plan`,
+          at: new Date().toISOString(),
+          farmId: crop.farmId,
+          cropId: crop.id,
+        },
+      };
+    }
+
     await wait();
     const crop: Crop = {
       id: nextId("crop"),
@@ -408,6 +518,105 @@ export const api: HarvestWindowApi = {
         at: new Date().toISOString(),
         farmId: crop.farmId,
         cropId: crop.id,
+      },
+    };
+  },
+
+  async updateCrop(id, input) {
+    if (API_CONFIG.mode === "live") {
+      const payload: Record<string, unknown> = {};
+      if (input.name !== undefined) payload.cropName = input.name;
+      if (input.cropName !== undefined) payload.cropName = input.cropName;
+      if (input.variety !== undefined) payload.variety = input.variety;
+      if (input.farmId !== undefined) payload.farmId = input.farmId;
+      if (input.plantingDate !== undefined) payload.sowingDate = input.plantingDate;
+      if (input.sowingDate !== undefined) payload.sowingDate = input.sowingDate;
+      if (input.expectedHarvestDate !== undefined) payload.expectedHarvestDate = input.expectedHarvestDate;
+      if (input.growthStage !== undefined) payload.growthStage = input.growthStage;
+      if (input.irrigation !== undefined) payload.irrigationMethod = input.irrigation;
+      if (input.irrigationMethod !== undefined) payload.irrigationMethod = input.irrigationMethod;
+      if (input.irrigationFrequency !== undefined) payload.irrigationFrequency = input.irrigationFrequency;
+      if (input.fieldArea !== undefined) payload.fieldArea = input.fieldArea;
+      if (input.expectedYield !== undefined) payload.expectedYield = input.expectedYield;
+      if (input.notes !== undefined) payload.notes = input.notes;
+
+      const res = await apiRequest<{ success: boolean; data: Crop }>(`/crops/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      });
+
+      const crop = res.data;
+      const snap = localStore.load() ?? buildSeedSnapshot();
+      snap.crops = snap.crops.map((c) => (c.id === id ? crop : c));
+      localStore.save(snap);
+
+      return {
+        crop,
+        activity: {
+          id: nextId("act"),
+          type: "crop-added",
+          message: `${crop.name} details updated`,
+          at: new Date().toISOString(),
+          farmId: crop.farmId,
+          cropId: crop.id,
+        },
+      };
+    }
+
+    await wait();
+    const snap = localStore.load() ?? buildSeedSnapshot();
+    const index = snap.crops.findIndex((c) => c.id === id);
+    if (index === -1) throw new Error("Crop not found");
+    const existing = snap.crops[index];
+    const crop: Crop = {
+      ...existing,
+      name: input.name ?? existing.name,
+      variety: input.variety ?? existing.variety,
+      farmId: input.farmId ?? existing.farmId,
+      plantingDate: input.plantingDate ?? existing.plantingDate,
+      growthStage: input.growthStage ?? existing.growthStage,
+      fieldArea: input.fieldArea ?? existing.fieldArea,
+      expectedYield: input.expectedYield ?? existing.expectedYield,
+      irrigation: input.irrigation ?? existing.irrigation,
+      notes: input.notes ?? existing.notes,
+    };
+    snap.crops[index] = crop;
+    localStore.save(snap);
+    return {
+      crop,
+      activity: {
+        id: nextId("act"),
+        type: "crop-added",
+        message: `${crop.name} details updated`,
+        at: new Date().toISOString(),
+        farmId: crop.farmId,
+        cropId: crop.id,
+      },
+    };
+  },
+
+  async deleteCrop(id) {
+    if (API_CONFIG.mode === "live") {
+      await apiRequest<{ success: boolean; message: string }>(`/crops/${id}`, {
+        method: "DELETE",
+      });
+    }
+
+    await wait();
+    const snap = localStore.load() ?? buildSeedSnapshot();
+    const crop = snap.crops.find((c) => c.id === id);
+    snap.crops = snap.crops.filter((c) => c.id !== id);
+    localStore.save(snap);
+
+    return {
+      id,
+      activity: {
+        id: nextId("act"),
+        type: "crop-added",
+        message: `${crop?.name ?? "A crop"} record removed from the plan`,
+        at: new Date().toISOString(),
+        farmId: crop?.farmId,
+        cropId: id,
       },
     };
   },

@@ -69,7 +69,33 @@ model Farm {
   updatedAt        DateTime @updatedAt
 
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  crops            Crop[]
 
   @@index([userId])
   @@map("farms")
+}
+
+// Crop model for Phase 3 Crop Management
+model Crop {
+  id                  String    @id @default(cuid())
+  farmId              String    @db.VarChar(191)
+  cropName            String    @db.VarChar(120)
+  variety             String?   @db.VarChar(100)
+  sowingDate          DateTime
+  expectedHarvestDate DateTime?
+  growthStage         String?   @db.VarChar(50)
+  irrigationMethod    String?   @db.VarChar(100)
+  irrigationFrequency String?   @db.VarChar(100)
+  fieldArea           Decimal?  @db.Decimal(12, 2)
+  expectedYield       String?   @db.VarChar(100)
+  notes               String?   @db.Text
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  farm                Farm      @relation(fields: [farmId], references: [id], onDelete: Cascade)
+
+  @@index([farmId])
+  @@index([cropName])
+  @@index([growthStage])
+  @@map("crops")
 }
