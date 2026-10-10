@@ -207,7 +207,7 @@ export default function ForecastPage() {
                 </caption>
                 <thead>
                   <tr className="border-b border-line bg-cream/70">
-                    {["Crop", "Farm", "Sown", "Estimated window", "Opens", "Readiness", "Inputs"].map(
+                    {["Crop", "Farm", "Sown", "Estimated window", "Engine Method", "Opens", "Readiness", "Inputs"].map(
                       (h) => (
                         <th
                           key={h}
@@ -258,6 +258,16 @@ export default function ForecastPage() {
                             </span>
                           ) : null}
                         </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={cn(
+                          "inline-block rounded-full px-2 py-0.5 font-mono text-[11px] font-semibold",
+                          row.forecast.weatherAdjustmentApplied
+                            ? "border border-gold/30 bg-gold/15 text-[#8a6415]"
+                            : "border border-forest/20 bg-forest/10 text-forest-deep"
+                        )}>
+                          {row.forecast.weatherAdjustmentApplied ? "GDD + Weather" : "Agronomic Baseline"}
+                        </span>
                       </td>
                       <td className="px-4 py-3 text-[12.5px] text-muted">
                         {row.forecast.daysToWindowStart > 0

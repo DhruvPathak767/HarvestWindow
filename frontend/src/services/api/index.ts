@@ -291,6 +291,13 @@ export interface HarvestWindowApi {
     readinessStatus?: string;
   }): Promise<Forecast[]>;
   getForecast(cropId: string): Promise<Forecast>;
+  predictHarvest(input: {
+    cropId?: string;
+    farmId?: string;
+    sowingDate?: string;
+    referenceDate?: string;
+  }): Promise<{ success: boolean; status: string; message?: string; prediction?: any }>;
+  getPredictionHistory(cropId: string): Promise<any[]>;
   refreshForecasts(scope?: {
     farmId?: string;
     cropId?: string;
@@ -964,6 +971,41 @@ export const api: HarvestWindowApi = {
     const farm = snap.farms.find((f) => f.id === crop.farmId);
     const weather = farm ? weatherService.snapshotForFarm(farm) : null;
     return computeForecast(crop, weather);
+  },
+
+  async predictHarvest(input) {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const res = await apiRequest<{
+          success: boolean;
+          status: string;
+          message?: string;
+          prediction?: any;
+        }>("/harvest-predictions", {
+          method: "POST",
+          body: JSON.stringify(input),
+        });
+        return res;
+      } catch (err) {
+        console.warn("[HarvestWindow API] Live predictHarvest failed:", err);
+      }
+    }
+    return { success: false, status: "error", message: "Live backend prediction unavailable" };
+  },
+
+  async getPredictionHistory(cropId: string) {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const res = await apiRequest<{
+          success: boolean;
+          data: any[];
+        }>(`/harvest-predictions/history/${cropId}`);
+        return res?.data || [];
+      } catch (err) {
+        console.warn("[HarvestWindow API] Live getPredictionHistory failed:", err);
+      }
+    }
+    return [];
   },
 
   async refreshForecasts(scope) {

@@ -1,0 +1,57 @@
+{
+  "baseline_mae_days": 2.43,
+  "baseline_rmse_days": 3.07,
+  "ml_mae_days": 1.27,
+  "ml_rmse_days": 1.57,
+  "evaluation_samples": 300,
+  "crop_breakdown": {
+    "chickpea": {
+      "baseline_mae": 2.62,
+      "ml_mae": 1.25
+    },
+    "cotton": {
+      "baseline_mae": 2.35,
+      "ml_mae": 1.25
+    },
+    "groundnut": {
+      "baseline_mae": 2.46,
+      "ml_mae": 1.31
+    },
+    "maize": {
+      "baseline_mae": 2.04,
+      "ml_mae": 1.09
+    },
+    "mustard": {
+      "baseline_mae": 2.12,
+      "ml_mae": 1.26
+    },
+    "onion": {
+      "baseline_mae": 2.42,
+      "ml_mae": 1.3
+    },
+    "potato": {
+      "baseline_mae": 3.08,
+      "ml_mae": 1.29
+    },
+    "rice (paddy)": {
+      "baseline_mae": 2.26,
+      "ml_mae": 1.4
+    },
+    "soybean": {
+      "baseline_mae": 2.42,
+      "ml_mae": 0.96
+    },
+    "sugarcane": {
+      "baseline_mae": 2.54,
+      "ml_mae": 1.13
+    },
+    "tomato": {
+      "baseline_mae": 3.42,
+      "ml_mae": 2.03
+    },
+    "wheat": {
+      "baseline_mae": 2.4,
+      "ml_mae": 1.3
+    }
+  }
+}

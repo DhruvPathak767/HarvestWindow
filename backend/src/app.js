@@ -17,6 +17,7 @@ import recommendationRoutes from "./modules/recommendations/recommendations.rout
 import activityRoutes from "./modules/activity/activity.routes.js";
 import notificationRoutes from "./modules/notifications/notifications.routes.js";
 import agricultureRoutes from "./modules/agriculture/agriculture.routes.js";
+import harvestPredictionRoutes from "./modules/forecasts/harvestPrediction.routes.js";
 
 export const app = express();
 
@@ -114,6 +115,9 @@ app.use("/api/notifications", notificationRoutes);
 
 app.use("/api/v1/agriculture", agricultureRoutes);
 app.use("/api/agriculture", agricultureRoutes);
+
+app.use("/api/v1/harvest-predictions", harvestPredictionRoutes);
+app.use("/api/harvest-predictions", harvestPredictionRoutes);
 
 // 404 Handler & Centralized Error Handler
 app.use(notFoundHandler);

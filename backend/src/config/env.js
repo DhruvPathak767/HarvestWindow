@@ -23,6 +23,7 @@ const envSchema = z.object({
   ADMIN_NAME: z.string().default("HarvestWindow Administrator"),
   ADMIN_EMAIL: z.string().email().default("admin@harvestwindow.local"),
   ADMIN_PASSWORD: z.string().min(8).default("HarvestAdmin#2026!Secure"),
+  HARVEST_AI_SERVICE_URL: z.string().default("http://127.0.0.1:8000"),
 });
 
 const parsed = envSchema.safeParse(process.env);

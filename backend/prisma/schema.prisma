@@ -36,6 +36,7 @@ model User {
   recommendations Recommendation[]
   activities      Activity[]
   notifications   Notification[]
+  harvestPredictions HarvestPrediction[]
 
   @@index([role])
   @@map("users")
@@ -83,6 +84,7 @@ model Farm {
   recommendations        Recommendation[]
   activities             Activity[]
   notifications          Notification[]
+  harvestPredictions     HarvestPrediction[]
 
   @@index([userId])
   @@map("farms")
@@ -131,6 +133,7 @@ model Crop {
   recommendations     Recommendation[]
   activities          Activity[]
   notifications       Notification[]
+  harvestPredictions  HarvestPrediction[]
 
   @@index([farmId])
   @@index([cropName])
@@ -495,5 +498,45 @@ model CropDiseaseMetadata {
   @@index([crop])
   @@index([diagnosis])
   @@map("crop_disease_metadata")
+}
+
+// ==========================================
+// Phase AI-2: Harvest Window Prediction Engine Models
+// ==========================================
+model HarvestPrediction {
+  id                    String    @id @default(cuid())
+  userId                String    @db.VarChar(191)
+  farmId                String    @db.VarChar(191)
+  cropId                String    @db.VarChar(191)
+  predictionDate        DateTime  @default(now())
+  estimatedHarvestStart DateTime?
+  mostLikelyHarvestDate DateTime
+  estimatedHarvestEnd   DateTime?
+  daysUntilHarvest      Int       @default(0)
+  isPastDue             Boolean   @default(false)
+  predictionMethod      String    @db.VarChar(50) // "agronomic_baseline" | "agronomic_gdd_weather" | "supervised_ml"
+  modelVersion          String    @db.VarChar(60)
+  uncertaintyType       String?   @db.VarChar(50)
+  uncertaintySpanDays   Int?
+  baseTemperatureC      Decimal?  @db.Decimal(5, 2)
+  accumulatedGdd        Decimal?  @db.Decimal(8, 2)
+  requiredGdd           Decimal?  @db.Decimal(8, 2)
+  gddProgressPct        Decimal?  @db.Decimal(5, 2)
+  weatherAdjustDays     Int       @default(0)
+  weatherAvailable      Boolean   @default(false)
+  dataQualityJson       String?   @db.Text
+  explanationJson       String?   @db.Text
+  assumptionsJson       String?   @db.Text
+  inputSnapshotJson     String?   @db.Text
+  createdAt             DateTime  @default(now())
+
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  farm                  Farm      @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  crop                  Crop      @relation(fields: [cropId], references: [id], onDelete: Cascade)
+
+  @@index([userId, cropId])
+  @@index([cropId, predictionDate])
+  @@index([farmId])
+  @@map("harvest_predictions")
 }
 
