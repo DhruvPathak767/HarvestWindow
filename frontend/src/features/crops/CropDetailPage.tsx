@@ -6,7 +6,6 @@ import {
   CalendarRange,
   CheckCircle2,
   CloudRain,
-  Cpu,
   Flame,
   Gauge,
   History,
@@ -99,13 +98,13 @@ export default function CropDetailPage() {
         if (Array.isArray(updatedHistory)) setHistoryList(updatedHistory);
       } else if (res && res.status === "insufficient_data") {
         toast({
-          tone: "caution",
+          tone: "warning",
           title: "Insufficient Data for Prediction",
           description: res.message || "Please provide required crop parameters.",
         });
       } else {
         toast({
-          tone: "caution",
+          tone: "warning",
           title: "Prediction Completed via Fallback",
           description: res?.message || "Agronomic baseline was computed.",
         });
@@ -118,6 +117,22 @@ export default function CropDetailPage() {
       });
     } finally {
       setAiPredicting(false);
+    }
+  };
+
+  const handleOpenHistory = async () => {
+    setHistoryOpen(true);
+    if (!crop) return;
+    setHistoryLoading(true);
+    try {
+      const records = await api.getPredictionHistory(crop.id);
+      if (Array.isArray(records)) {
+        setHistoryList(records);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setHistoryLoading(false);
     }
   };
 

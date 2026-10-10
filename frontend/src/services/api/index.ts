@@ -294,8 +294,11 @@ export interface HarvestWindowApi {
   predictHarvest(input: {
     cropId?: string;
     farmId?: string;
+    cropName?: string;
+    variety?: string;
     sowingDate?: string;
     referenceDate?: string;
+    observedGrowthStage?: string;
   }): Promise<{ success: boolean; status: string; message?: string; prediction?: any }>;
   getPredictionHistory(cropId: string): Promise<any[]>;
   refreshForecasts(scope?: {
