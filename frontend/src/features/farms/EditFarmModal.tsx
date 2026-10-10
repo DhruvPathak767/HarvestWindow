@@ -14,7 +14,7 @@ import {
 import { INDIAN_STATES } from "@/data/mock/cropCatalog";
 import { useStore } from "@/store/AppStore";
 import type { Farm } from "@/types";
-import { SOIL_TYPE_OPTIONS, IRRIGATION_SOURCE_OPTIONS } from "./AddFarmModal";
+import { SOIL_TYPE_OPTIONS, IRRIGATION_SOURCE_OPTIONS } from "./farmConstants";
 import { detectBrowserLocation } from "@/services/location/geolocationService";
 
 const coord = (min: number, max: number, name: string) =>

@@ -27,7 +27,7 @@ import { STAGE_TEMPLATES, type Crop, type Farm } from "@/types";
 import { computeForecast } from "@/services/forecast/forecastService";
 import { weatherService } from "@/services/weather/weatherService";
 import { detectBrowserLocation } from "@/services/location/geolocationService";
-import { SOIL_TYPE_OPTIONS, IRRIGATION_SOURCE_OPTIONS } from "@/features/farms/AddFarmModal";
+import { SOIL_TYPE_OPTIONS, IRRIGATION_SOURCE_OPTIONS } from "@/features/farms/farmConstants";
 import {
   addDays,
   daysLabel,
@@ -66,7 +66,7 @@ const EMPTY_DRAFT: OnboardingDraft = {
 };
 
 export function OnboardingFlow({ open }: { open: boolean }) {
-  const { setShowOnboarding, completeOnboarding } = useStore();
+  const { setShowOnboarding, completeOnboarding, dismissOnboarding } = useStore();
   const reduced = useReducedMotion();
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<OnboardingDraft>(EMPTY_DRAFT);
@@ -174,11 +174,11 @@ export function OnboardingFlow({ open }: { open: boolean }) {
   };
 
   const close = useCallback(() => {
-    setShowOnboarding(false);
+    dismissOnboarding();
     setStep(0);
     setLocationSuccess(null);
     setLocationError(null);
-  }, [setShowOnboarding]);
+  }, [dismissOnboarding]);
 
   const next = () => {
     if (step >= 1 && step <= 3 && !validateStep(step)) return;

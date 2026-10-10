@@ -107,6 +107,7 @@ interface StoreValue {
   signOut: () => void;
 
   completeOnboarding: (draft: OnboardingDraft) => Promise<void>;
+  dismissOnboarding: () => void;
   addFarm: (input: NewFarmInput) => Promise<Farm>;
   updateFarm: (id: string, input: UpdateFarmInput) => Promise<Farm>;
   deleteFarm: (id: string) => Promise<void>;
@@ -425,11 +426,25 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
   /* ------------------------------------------------------------ onboarding */
 
+  const dismissOnboarding = useCallback(() => {
+    patch((prev) => ({
+      ...prev,
+      onboarded: true,
+    }));
+    setShowOnboarding(false);
+  }, [patch]);
+
   useEffect(() => {
-    if (ready && snapshot.signedIn && !snapshot.onboarded && !showOnboarding) {
-      setShowOnboarding(true);
+    if (ready && snapshot.signedIn) {
+      if (snapshot.farms && snapshot.farms.length > 0 && !snapshot.onboarded) {
+        patch((prev) => ({ ...prev, onboarded: true }));
+        return;
+      }
+      if (!snapshot.onboarded && !showOnboarding && (!snapshot.farms || snapshot.farms.length === 0)) {
+        setShowOnboarding(true);
+      }
     }
-  }, [ready, snapshot.signedIn, snapshot.onboarded, showOnboarding]);
+  }, [ready, snapshot.signedIn, snapshot.onboarded, snapshot.farms, showOnboarding, patch]);
 
   const completeOnboarding = useCallback<StoreValue["completeOnboarding"]>(
     async (draft) => {
@@ -773,6 +788,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       signUp,
       signOut,
       completeOnboarding,
+      dismissOnboarding,
       addFarm,
       updateFarm,
       deleteFarm,
@@ -802,6 +818,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       signUp,
       signOut,
       completeOnboarding,
+      dismissOnboarding,
       addFarm,
       updateFarm,
       deleteFarm,

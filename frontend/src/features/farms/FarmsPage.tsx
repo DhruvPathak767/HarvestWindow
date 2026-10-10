@@ -1,15 +1,17 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowUpRight, Layers, MapPin, Plus, Sprout, Tractor } from "lucide-react";
+import { ArrowUpRight, Layers, MapPin, Pencil, Plus, Sprout, Tractor, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button, Card, EmptyState, StatusBadge } from "@/components/common/ui";
+import { Modal } from "@/components/common/Modal";
 import { AddFarmModal } from "@/features/farms/AddFarmModal";
+import { EditFarmModal } from "@/features/farms/EditFarmModal";
 import { CropImage } from "@/components/common/CropImage";
 import { CROP_IMAGES } from "@/data/mock/cropCatalog";
 import { useStore } from "@/store/AppStore";
 import { formatDate, formatDateRange } from "@/utils/date";
-import type { ReadinessStatus } from "@/types";
+import type { Farm, ReadinessStatus } from "@/types";
 import { cn } from "@/utils/cn";
 
 const STATUS_ORDER: ReadinessStatus[] = [
@@ -21,11 +23,29 @@ const STATUS_ORDER: ReadinessStatus[] = [
 ];
 
 export default function FarmsPage() {
-  const { farms, crops, forecasts, selectedFarmId, selectFarm } = useStore();
+  const { farms, crops, forecasts, selectedFarmId, selectFarm, deleteFarm } = useStore();
   const navigate = useNavigate();
   const reduced = useReducedMotion();
   const [addOpen, setAddOpen] = useState(false);
+  const [farmToEdit, setFarmToEdit] = useState<Farm | null>(null);
+  const [farmToDelete, setFarmToDelete] = useState<Farm | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+
+  const handleDeleteFarm = async () => {
+    if (!farmToDelete) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteFarm(farmToDelete.id);
+      setFarmToDelete(null);
+    } catch (err: unknown) {
+      setDeleteError(err instanceof Error ? err.message : "Unable to delete farm");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -179,6 +199,28 @@ export default function FarmsPage() {
                       >
                         {selectedFarmId === farm.id ? "Focused in workspace" : "Focus in workspace"}
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setFarmToEdit(farm)}
+                        aria-label={`Edit ${farm.name}`}
+                      >
+                        <Pencil className="h-3.5 w-3.5" aria-hidden />
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setDeleteError(null);
+                          setFarmToDelete(farm);
+                        }}
+                        className="text-danger hover:bg-danger/10 hover:text-danger"
+                        aria-label={`Delete ${farm.name}`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                        Delete
+                      </Button>
                       <span className="ml-auto font-mono text-[10.5px] tracking-wide text-muted uppercase">
                         Added {formatDate(farm.createdAt)}
                       </span>
@@ -222,6 +264,67 @@ export default function FarmsPage() {
       </p>
 
       <AddFarmModal open={addOpen} onClose={() => setAddOpen(false)} />
+
+      {farmToEdit && (
+        <EditFarmModal
+          open={!!farmToEdit}
+          onClose={() => setFarmToEdit(null)}
+          farm={farmToEdit}
+        />
+      )}
+
+      {farmToDelete && (
+        <Modal
+          open={!!farmToDelete}
+          onClose={() => {
+            if (!deleting) {
+              setFarmToDelete(null);
+              setDeleteError(null);
+            }
+          }}
+          title={`Delete ${farmToDelete.name}`}
+          description="Confirm permanent removal of this farm record."
+          size="sm"
+          footer={
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setFarmToDelete(null);
+                  setDeleteError(null);
+                }}
+                disabled={deleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleDeleteFarm}
+                loading={deleting}
+                className="bg-danger text-white hover:bg-danger/90"
+              >
+                Delete farm
+              </Button>
+            </>
+          }
+        >
+          <div className="flex flex-col gap-3 py-1">
+            {deleteError && (
+              <div
+                role="alert"
+                className="rounded-md border border-danger/35 bg-[#fdf1ee] p-3 text-[12.5px] text-[#8d3a26]"
+              >
+                {deleteError}
+              </div>
+            )}
+            <p className="text-[13px] leading-relaxed text-muted">
+              Are you sure you want to permanently delete <strong>{farmToDelete.name}</strong> ({farmToDelete.district}, {farmToDelete.state})? This will detach or remove any crop blocks and harvest estimates associated with this farm.
+            </p>
+          </div>
+        </Modal>
+      )}
 
       <Link to="/app" className="sr-only">
         Back to overview
