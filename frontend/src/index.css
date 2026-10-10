@@ -1,0 +1,436 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------
+   HarvestWindow — "Living Earth Intelligence" design tokens
+   --------------------------------------------------------------- */
+@theme {
+  --color-forest-deep: #163d2b;
+  --color-forest: #245c3a;
+  --color-living: #5b8c45;
+  --color-sage: #b8cba7;
+  --color-cream: #f7f5ec;
+  --color-gold: #e8b64a;
+  --color-gold-soft: #f6e3b4;
+  --color-earth: #8b6548;
+  --color-ink: #202a22;
+  --color-muted: #6b756b;
+  --color-line: #e3e7dc;
+  --color-soft: #edf3e8;
+
+  /* cinematic night palette for the immersive sections */
+  --color-night: #06140d;
+  --color-night-2: #0a1c12;
+  --color-night-3: #10291b;
+
+  --color-caution: #c9762f;
+  --color-danger: #b4462f;
+  --color-info: #3e6e8e;
+
+  --font-display: "Manrope", "Plus Jakarta Sans", ui-sans-serif, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-serif: "Instrument Serif", "Times New Roman", serif;
+
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 22px;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-cream);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5 {
+    font-family: var(--font-display);
+    color: var(--color-forest-deep);
+    letter-spacing: -0.02em;
+  }
+
+  ::selection {
+    background: var(--color-gold);
+    color: var(--color-night);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-gold);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+
+  input,
+  select,
+  textarea,
+  button {
+    font-family: inherit;
+  }
+}
+
+/* ---------------------------------------------------------------
+   Lenis smooth scrolling
+   --------------------------------------------------------------- */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+/* ---------------------------------------------------------------
+   Typography helpers
+   --------------------------------------------------------------- */
+.hw-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.hw-serif {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.015em;
+}
+
+.hw-gold-text {
+  background-image: linear-gradient(
+    100deg,
+    #c98f2a 0%,
+    #e8b64a 22%,
+    #fff0c4 45%,
+    #f2c45e 58%,
+    #e8b64a 75%,
+    #b9801f 100%
+  );
+  background-size: 220% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: hw-gold-sweep 7s linear infinite;
+}
+
+@keyframes hw-gold-sweep {
+  to {
+    background-position: 220% center;
+  }
+}
+
+.hw-outline-text {
+  -webkit-text-stroke: 1.5px currentColor;
+  color: transparent;
+}
+
+.hw-num {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  letter-spacing: -0.03em;
+}
+
+/* ---------------------------------------------------------------
+   Surfaces & texture
+   --------------------------------------------------------------- */
+.hw-grain {
+  background-image: radial-gradient(circle at 1px 1px, rgba(22, 61, 43, 0.055) 1px, transparent 0);
+  background-size: 22px 22px;
+}
+
+.hw-grain-light {
+  background-image: radial-gradient(circle at 1px 1px, rgba(247, 245, 236, 0.07) 1px, transparent 0);
+  background-size: 24px 24px;
+}
+
+.hw-contour {
+  background-image: repeating-radial-gradient(
+    circle at 80% 10%,
+    rgba(91, 140, 69, 0.09) 0px,
+    rgba(91, 140, 69, 0.09) 1px,
+    transparent 1px,
+    transparent 26px
+  );
+}
+
+.hw-noise {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  background-size: 180px 180px;
+}
+
+.hw-card {
+  background: #ffffff;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    0 1px 2px rgba(22, 61, 43, 0.04),
+    0 8px 24px -18px rgba(22, 61, 43, 0.35);
+}
+
+.hw-card-hover {
+  transition:
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 220ms ease;
+}
+
+.hw-card-hover:hover {
+  transform: translateY(-3px);
+  border-color: rgba(91, 140, 69, 0.45);
+  box-shadow:
+    0 2px 4px rgba(22, 61, 43, 0.05),
+    0 22px 44px -26px rgba(22, 61, 43, 0.45);
+}
+
+.hw-shadow-deep {
+  box-shadow:
+    0 1px 2px rgba(8, 24, 16, 0.16),
+    0 30px 60px -30px rgba(8, 24, 16, 0.55);
+}
+
+/* Floating HUD glass used over the 3D scenes */
+.hw-hud {
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.03));
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(18px) saturate(135%);
+  -webkit-backdrop-filter: blur(18px) saturate(135%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 40px 80px -40px rgba(0, 0, 0, 0.9);
+}
+
+.hw-glass-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: var(--color-cream);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition:
+    background-color 200ms ease,
+    border-color 200ms ease;
+}
+.hw-glass-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(232, 182, 74, 0.55);
+}
+
+/* Light sweep on premium buttons */
+.hw-shine {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.hw-shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  transform: translateX(-130%) skewX(-22deg);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+  transition: transform 800ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.hw-shine:hover::after {
+  transform: translateX(130%) skewX(-22deg);
+}
+
+.hw-mask-radial {
+  -webkit-mask-image: radial-gradient(closest-side, #000 58%, transparent 100%);
+  mask-image: radial-gradient(closest-side, #000 58%, transparent 100%);
+}
+
+.hw-mask-soft {
+  -webkit-mask-image: radial-gradient(closest-side, #000 72%, transparent 100%);
+  mask-image: radial-gradient(closest-side, #000 72%, transparent 100%);
+}
+
+.hw-scroll-x {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-sage) transparent;
+}
+.hw-scroll-x::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+.hw-scroll-x::-webkit-scrollbar-thumb {
+  background: var(--color-sage);
+  border-radius: 99px;
+}
+
+.hw-no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hw-no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.hw-link-underline {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-size: 0% 1px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  transition: background-size 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.hw-link-underline:hover {
+  background-size: 100% 1px;
+}
+
+/* ---------------------------------------------------------------
+   Motion primitives
+   --------------------------------------------------------------- */
+.hw-shimmer {
+  position: relative;
+  overflow: hidden;
+  background: rgba(22, 61, 43, 0.06);
+}
+.hw-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.65), transparent);
+  animation: hw-shimmer 1.6s infinite;
+}
+@keyframes hw-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes hw-drift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(2.5%, -2%, 0) scale(1.06);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+.hw-drift {
+  animation: hw-drift 26s ease-in-out infinite;
+}
+
+@keyframes hw-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(0, -16px, 0) rotate(0.8deg);
+  }
+}
+.hw-float {
+  animation: hw-float 7s ease-in-out infinite;
+}
+.hw-float-slow {
+  animation: hw-float 11s ease-in-out infinite;
+}
+
+@keyframes hw-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.hw-spin-slow {
+  animation: hw-spin 90s linear infinite;
+}
+.hw-spin-mid {
+  animation: hw-spin 40s linear infinite;
+}
+.hw-spin-rev {
+  animation: hw-spin 60s linear infinite reverse;
+}
+
+@keyframes hw-rise {
+  0% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate3d(40px, -110vh, 0);
+    opacity: 0;
+  }
+}
+.hw-rise {
+  animation: hw-rise 12s linear infinite;
+}
+
+@keyframes hw-pulse-ring {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+.hw-pulse-ring {
+  animation: hw-pulse-ring 2.4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+@keyframes hw-scroll-line {
+  0% {
+    transform: scaleY(0);
+    transform-origin: top;
+  }
+  45% {
+    transform: scaleY(1);
+    transform-origin: top;
+  }
+  55% {
+    transform: scaleY(1);
+    transform-origin: bottom;
+  }
+  100% {
+    transform: scaleY(0);
+    transform-origin: bottom;
+  }
+}
+.hw-scroll-line {
+  animation: hw-scroll-line 2.2s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+/* ---------------------------------------------------------------
+   Reduced motion support
+   --------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
