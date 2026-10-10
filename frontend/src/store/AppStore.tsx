@@ -20,6 +20,7 @@ import type {
   WeatherSummary,
 } from "@/types";
 import {
+  API_CONFIG,
   api,
   authApi,
   buildIntelligence,
@@ -122,7 +123,8 @@ interface StoreValue {
   setRecommendationStatus: (id: string, status: RecommendationStatus) => Promise<void>;
   updateSettings: (patch: Partial<AppSettings>) => Promise<void>;
   updateProfile: (patch: Partial<UserProfile>) => Promise<void>;
-  refreshForecasts: (scope?: string) => void;
+  refreshingForecasts: boolean;
+  refreshForecasts: (scope?: string, farmId?: string, cropId?: string) => Promise<void> | void;
   resetDemoData: () => Promise<void>;
   markNotificationsRead: () => void;
 }
@@ -149,6 +151,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [selectedFarmId, setSelectedFarmId] = useState<FarmSelection>(ALL_FARMS);
   const [readNotificationIds, setReadNotificationIds] = useState<string[]>([]);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [serverForecasts, setServerForecasts] = useState<Record<string, Forecast>>({});
+  const [refreshingForecasts, setRefreshingForecasts] = useState(false);
   const hydrated = useRef(false);
 
   const load = useCallback(async () => {
@@ -186,6 +190,23 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       setSnapshot(data);
       hydrated.current = true;
       setSelectedFarmId(data.settings?.defaultFarmId ?? data.farms[0]?.id ?? ALL_FARMS);
+
+      // 3. In live API mode, pull live harvest predictions from prediction engine
+      if (API_CONFIG.mode === "live") {
+        try {
+          const list = await api.listForecasts();
+          if (Array.isArray(list) && list.length > 0) {
+            const map: Record<string, Forecast> = {};
+            for (const f of list) {
+              map[f.cropId] = f;
+            }
+            setServerForecasts(map);
+          }
+        } catch (fcErr) {
+          console.warn("[HarvestWindow API] Unable to fetch live forecasts during snapshot load:", fcErr);
+        }
+      }
+
       setReady(true);
     } catch {
       setLoadError(
@@ -217,8 +238,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   );
 
   const intelligence = useMemo(
-    () => buildIntelligence(snapshot.farms, snapshot.crops),
-    [snapshot.farms, snapshot.crops]
+    () => buildIntelligence(snapshot.farms, snapshot.crops, serverForecasts),
+    [snapshot.farms, snapshot.crops, serverForecasts]
   );
 
   const notifications = useMemo<AppNotification[]>(() => {
@@ -775,23 +796,44 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   );
 
   const refreshForecasts = useCallback<StoreValue["refreshForecasts"]>(
-    (scope) => {
-      pushActivity({
-        id: newActivityId(),
-        type: "forecast-refreshed",
-        message: scope
-          ? `Forecast refreshed · ${scope}`
-          : `All estimates refreshed across ${snapshot.farms.length} farm${
-              snapshot.farms.length === 1 ? "" : "s"
-            }`,
-        at: new Date().toISOString(),
-      });
-      toast({
-        tone: "info",
-        title: "Estimates refreshed",
-        description:
-          "Recomputed from the recorded planting dates, reference durations and demo weather.",
-      });
+    async (scope, farmId, cropId) => {
+      setRefreshingForecasts(true);
+      try {
+        const result = await api.refreshForecasts({ farmId, cropId });
+        if (result?.forecasts && result.forecasts.length > 0) {
+          setServerForecasts((prev) => {
+            const next = { ...prev };
+            for (const f of result.forecasts) {
+              next[f.cropId] = f;
+            }
+            return next;
+          });
+        }
+        pushActivity({
+          id: newActivityId(),
+          type: "forecast-refreshed",
+          message: scope
+            ? `Forecast refreshed · ${scope}`
+            : `All estimates refreshed across ${snapshot.farms.length} farm${
+                snapshot.farms.length === 1 ? "" : "s"
+              }`,
+          at: new Date().toISOString(),
+          farmId,
+          cropId,
+        });
+        toast({
+          tone: "info",
+          title: "Estimates refreshed",
+          description: `Updated ${result.updated} harvest forecast${
+            result.updated === 1 ? "" : "s"
+          } from prediction engine.`,
+        });
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Failed to refresh forecasts";
+        toast({ tone: "error", title: "Refresh failed", description: msg });
+      } finally {
+        setRefreshingForecasts(false);
+      }
     },
     [pushActivity, snapshot.farms.length, toast]
   );
@@ -853,6 +895,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       setRecommendationStatus,
       updateSettings,
       updateProfile,
+      refreshingForecasts,
       refreshForecasts,
       resetDemoData,
       markNotificationsRead,
@@ -885,6 +928,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       refreshCrops,
       setRecommendationStatus,
       updateSettings,
+      refreshingForecasts,
       refreshForecasts,
       resetDemoData,
       markNotificationsRead,

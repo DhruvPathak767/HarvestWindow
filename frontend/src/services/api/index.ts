@@ -15,7 +15,7 @@ import {
 } from "@/services/storage/localStore";
 import { DEMO_CREDENTIALS } from "@/data/mock/seed";
 import { weatherService } from "@/services/weather/weatherService";
-import { computeForecasts } from "@/services/forecast/forecastService";
+import { computeForecast, computeForecasts } from "@/services/forecast/forecastService";
 
 import { authClient } from "@/services/api/authClient";
 
@@ -199,6 +199,21 @@ export interface HarvestWindowApi {
     input: UpdateCropInput
   ): Promise<{ crop: Crop; activity: ActivityEvent }>;
   deleteCrop(id: string): Promise<{ id: string; activity: ActivityEvent }>;
+  listForecasts(params?: {
+    farmId?: string;
+    cropId?: string;
+    readinessStatus?: string;
+  }): Promise<Forecast[]>;
+  getForecast(cropId: string): Promise<Forecast>;
+  refreshForecasts(scope?: {
+    farmId?: string;
+    cropId?: string;
+  }): Promise<{
+    processed: number;
+    updated: number;
+    failed: number;
+    forecasts: Forecast[];
+  }>;
   setRecommendationStatus(
     id: string,
     status: RecommendationStatus
@@ -636,6 +651,93 @@ export const api: HarvestWindowApi = {
     };
   },
 
+  async listForecasts(params) {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const query = new URLSearchParams();
+        if (params?.farmId) query.set("farmId", params.farmId);
+        if (params?.cropId) query.set("cropId", params.cropId);
+        if (params?.readinessStatus) query.set("readinessStatus", params.readinessStatus);
+        const qs = query.toString() ? `?${query.toString()}` : "";
+        const res = await apiRequest<{ success: boolean; data: { forecasts: Forecast[] } }>(
+          `/forecasts${qs}`
+        );
+        if (Array.isArray(res?.data?.forecasts)) {
+          return res.data.forecasts;
+        }
+      } catch (err) {
+        console.warn("[HarvestWindow API] Live listForecasts failed, using fallback:", err);
+      }
+    }
+
+    await wait();
+    const snap = localStore.load() ?? buildSeedSnapshot();
+    const weather: Record<string, ReturnType<typeof weatherService.snapshotForFarm>> = {};
+    for (const f of snap.farms) weather[f.id] = weatherService.snapshotForFarm(f);
+    let targetCrops = snap.crops;
+    if (params?.farmId) targetCrops = targetCrops.filter((c) => c.farmId === params.farmId);
+    if (params?.cropId) targetCrops = targetCrops.filter((c) => c.id === params.cropId);
+    const computed = computeForecasts(targetCrops, weather);
+    let list = Object.values(computed);
+    if (params?.readinessStatus) {
+      list = list.filter((f) => f.readinessStatus === params.readinessStatus);
+    }
+    return list;
+  },
+
+  async getForecast(cropId) {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const res = await apiRequest<{ success: boolean; data: Forecast }>(`/forecasts/${cropId}`);
+        if (res?.data) return res.data;
+      } catch (err) {
+        console.warn(`[HarvestWindow API] Live getForecast failed for ${cropId}:`, err);
+      }
+    }
+
+    await wait();
+    const snap = localStore.load() ?? buildSeedSnapshot();
+    const crop = snap.crops.find((c) => c.id === cropId);
+    if (!crop) throw new Error("Crop not found");
+    const farm = snap.farms.find((f) => f.id === crop.farmId);
+    const weather = farm ? weatherService.snapshotForFarm(farm) : null;
+    return computeForecast(crop, weather);
+  },
+
+  async refreshForecasts(scope) {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const res = await apiRequest<{
+          success: boolean;
+          message: string;
+          data: { processed: number; updated: number; failed: number; forecasts: Forecast[] };
+        }>("/forecasts/refresh", {
+          method: "POST",
+          body: JSON.stringify(scope || {}),
+        });
+        if (res?.data) return res.data;
+      } catch (err) {
+        console.warn("[HarvestWindow API] Live refreshForecasts failed, using client recalculation:", err);
+      }
+    }
+
+    await wait(300);
+    const snap = localStore.load() ?? buildSeedSnapshot();
+    const weather: Record<string, ReturnType<typeof weatherService.snapshotForFarm>> = {};
+    for (const f of snap.farms) weather[f.id] = weatherService.snapshotForFarm(f);
+    let targetCrops = snap.crops;
+    if (scope?.farmId) targetCrops = targetCrops.filter((c) => c.farmId === scope.farmId);
+    if (scope?.cropId) targetCrops = targetCrops.filter((c) => c.id === scope.cropId);
+    const computed = computeForecasts(targetCrops, weather);
+    const list = Object.values(computed);
+    return {
+      processed: list.length,
+      updated: list.length,
+      failed: 0,
+      forecasts: list,
+    };
+  },
+
   async setRecommendationStatus(id, status) {
     await wait(220);
     return { id, status };
@@ -702,12 +804,18 @@ export const authApi = {
 };
 
 /** Convenience: weather + forecasts for a set of farms/crops in one call. */
-export function buildIntelligence(farms: Farm[], crops: Crop[]): ForecastBundle {
+export function buildIntelligence(
+  farms: Farm[],
+  crops: Crop[],
+  overrideForecasts?: Record<string, Forecast>
+): ForecastBundle {
   const weather: Record<string, ReturnType<typeof weatherService.snapshotForFarm>> = {};
   for (const farm of farms) weather[farm.id] = weatherService.snapshotForFarm(farm);
   return {
     weather,
-    forecasts: computeForecasts(crops, weather),
+    forecasts: overrideForecasts && Object.keys(overrideForecasts).length > 0
+      ? { ...computeForecasts(crops, weather), ...overrideForecasts }
+      : computeForecasts(crops, weather),
   };
 }
 

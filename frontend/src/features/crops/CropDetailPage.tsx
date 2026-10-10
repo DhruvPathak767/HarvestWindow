@@ -12,6 +12,7 @@ import {
   ListChecks,
   MapPin,
   Pencil,
+  RefreshCw,
   Sprout,
   Trash2,
 } from "lucide-react";
@@ -42,6 +43,8 @@ export default function CropDetailPage() {
     recommendations,
     removeCrop,
     setRecommendationStatus,
+    refreshForecasts,
+    refreshingForecasts,
   } = useStore();
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -132,6 +135,16 @@ export default function CropDetailPage() {
         actions={
           <>
             <StatusBadge status={forecast.readinessStatus} full />
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => void refreshForecasts(crop.name, crop.farmId, crop.id)}
+              loading={refreshingForecasts}
+              aria-label={`Refresh prediction for ${crop.name}`}
+            >
+              <RefreshCw className="h-3.5 w-3.5" aria-hidden />
+              Refresh
+            </Button>
             <Button
               size="sm"
               variant="secondary"

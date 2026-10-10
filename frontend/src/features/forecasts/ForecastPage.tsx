@@ -24,7 +24,15 @@ type StatusFilter = "all" | ReadinessStatus;
 
 export default function ForecastPage() {
   const navigate = useNavigate();
-  const { farms, crops, forecasts, selectedFarmId, selectFarm, refreshForecasts } = useStore();
+  const {
+    farms,
+    crops,
+    forecasts,
+    selectedFarmId,
+    selectFarm,
+    refreshForecasts,
+    refreshingForecasts,
+  } = useStore();
   const [view, setView] = useState<ViewMode>("timeline");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [farmFilter, setFarmFilter] = useState<string>(selectedFarmId);
@@ -81,7 +89,12 @@ export default function ForecastPage() {
         ]}
         actions={
           <>
-            <Button size="sm" variant="secondary" onClick={() => refreshForecasts("forecast workspace")}>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => void refreshForecasts("forecast workspace", farmFilter === ALL_FARMS ? undefined : farmFilter)}
+              loading={refreshingForecasts}
+            >
               <RefreshCw className="h-4 w-4" aria-hidden />
               Refresh
             </Button>
