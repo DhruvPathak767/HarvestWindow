@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Test_Suite-133%2F133_PASSED-10B981?style=flat-square&logo=checkmarx&logoColor=white" alt="133 Tests Passed" />
+  <img src="https://img.shields.io/badge/Test_Suite-149%2F149_PASSED-10B981?style=flat-square&logo=checkmarx&logoColor=white" alt="149 Tests Passed" />
   <img src="https://img.shields.io/badge/Architecture-Deterministic_Agronomic_Engine-059669?style=flat-square" alt="Deterministic Engine" />
   <img src="https://img.shields.io/badge/Security-Multi--Tenant_Isolation-047857?style=flat-square" alt="Multi Tenant" />
   <img src="https://img.shields.io/badge/Weather-WeatherAPI%20%2B%20Open--Meteo-0284C7?style=flat-square" alt="Weather Dual Engine" />
@@ -39,6 +39,7 @@ The entire platform operates using **deterministic, rule-based agronomy grounded
 [Phase 4] ✅ Weather Integration & Live Location (Dual WeatherAPI + Open-Meteo 10-Day Horizon)
 [Phase 5] ✅ Precision Harvest Prediction Engine (GDD, Ripening Adjustments, Confidence Scores)
 [Phase 6] ✅ Contextual Recommendations Engine (Rules A–G, Deduplication, Status Lifecycles)
+[Phase 9] ✅ Activity Feed & Notifications (Persistent Audit Log, Alert Deduplication, In-App Notification Center)
 ```
 
 ---
@@ -55,6 +56,7 @@ flowchart TD
         WeatherUI[Weather & Geolocation]
         ForecastUI[Harvest Window Forecasts]
         RecsUI[Recommendations Engine UI]
+        ActivityUI[Activity Feed & Notification Bell]
         Store[AppStore & Zustand-style State]
     end
 
@@ -65,6 +67,8 @@ flowchart TD
         WeatherMod[Weather Provider Pipeline]
         ForecastMod[Phase 5 Prediction Engine]
         RecsMod[Phase 6 Recommendations Engine]
+        ActivityMod[Phase 9 Activity Service]
+        NotifMod[Phase 9 Notification Service]
     end
 
     subgraph WeatherProviders["Meteorological Intelligence"]

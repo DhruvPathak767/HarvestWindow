@@ -20,6 +20,7 @@ import { AddCropModal } from "@/features/crops/AddCropModal";
 import { OnboardingFlow } from "@/features/onboarding/OnboardingFlow";
 import { relativeTime } from "@/utils/date";
 import { ALL_FARMS, useStore } from "@/store/AppStore";
+import { API_CONFIG } from "@/services/api";
 import { cn } from "@/utils/cn";
 
 const COLLAPSE_KEY = "harvestwindow.sidebar.collapsed";
@@ -519,7 +520,7 @@ function NotificationBell() {
                 Notifications
               </p>
               <span className="font-mono text-[10.5px] text-muted">
-                Demo dataset
+                {API_CONFIG.mode === "live" ? "Live Feed" : "Demo dataset"}
               </span>
             </div>
             <ul className="hw-scroll-x max-h-80 overflow-y-auto">

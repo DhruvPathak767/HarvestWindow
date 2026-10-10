@@ -4,6 +4,7 @@ import { getWeatherForFarm } from "../weather/weather.service.js";
 import { evaluateCropRules } from "./recommendations.rules.js";
 import { predictHarvestWindow } from "../forecasts/predictionEngine.js";
 import { buildWeatherContext } from "../forecasts/weatherContext.js";
+import { logActivity } from "../activity/activity.service.js";
 
 /**
  * Normalizes recommendation item for API responses and frontend compatibility.
@@ -206,6 +207,16 @@ export async function refreshRecommendations(userId, options = {}) {
       });
       created++;
     }
+  }
+
+  if (created > 0) {
+    await logActivity({
+      userId,
+      type: "recommendation-generated",
+      title: "New recommendations generated",
+      message: `Generated ${created} new field recommendation${created === 1 ? "" : "s"}`,
+      entityType: "recommendation",
+    }).catch(() => null);
   }
 
   return {
@@ -442,5 +453,31 @@ export async function updateRecommendationStatus(userId, id, status) {
     },
   });
 
-  return formatRecommendation(updated);
+  const formatted = formatRecommendation(updated);
+
+  if (normalizedStatus === "completed") {
+    await logActivity({
+      userId,
+      type: "recommendation-completed",
+      title: `Recommendation completed: ${updated.title}`,
+      message: `Completed action: ${updated.title}`,
+      entityType: "recommendation",
+      entityId: updated.id,
+      farmId: updated.farmId,
+      cropId: updated.cropId,
+    }).catch(() => null);
+  } else if (normalizedStatus === "dismissed") {
+    await logActivity({
+      userId,
+      type: "recommendation-dismissed",
+      title: `Recommendation dismissed: ${updated.title}`,
+      message: `Dismissed recommendation: ${updated.title}`,
+      entityType: "recommendation",
+      entityId: updated.id,
+      farmId: updated.farmId,
+      cropId: updated.cropId,
+    }).catch(() => null);
+  }
+
+  return formatted;
 }

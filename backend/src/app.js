@@ -12,6 +12,8 @@ import cropRoutes from "./modules/crops/crops.routes.js";
 import forecastRoutes from "./modules/forecasts/forecasts.routes.js";
 import weatherRoutes from "./modules/weather/weather.routes.js";
 import recommendationRoutes from "./modules/recommendations/recommendations.routes.js";
+import activityRoutes from "./modules/activity/activity.routes.js";
+import notificationRoutes from "./modules/notifications/notifications.routes.js";
 
 export const app = express();
 
@@ -94,6 +96,12 @@ app.use("/api/weather", weatherRoutes);
 
 app.use("/api/v1/recommendations", recommendationRoutes);
 app.use("/api/recommendations", recommendationRoutes);
+
+app.use("/api/v1/activity", activityRoutes);
+app.use("/api/activity", activityRoutes);
+
+app.use("/api/v1/notifications", notificationRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // 404 Handler & Centralized Error Handler
 app.use(notFoundHandler);

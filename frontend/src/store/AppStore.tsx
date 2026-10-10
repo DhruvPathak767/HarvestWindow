@@ -154,6 +154,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedFarmId, setSelectedFarmId] = useState<FarmSelection>(ALL_FARMS);
   const [readNotificationIds, setReadNotificationIds] = useState<string[]>([]);
+  const [serverNotifications, setServerNotifications] = useState<AppNotification[]>([]);
+  const [serverUnreadCount, setServerUnreadCount] = useState<number | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [serverForecasts, setServerForecasts] = useState<Record<string, Forecast>>({});
   const [refreshingForecasts, setRefreshingForecasts] = useState(false);
@@ -212,6 +214,36 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         } catch (fcErr) {
           console.warn("[HarvestWindow API] Unable to fetch live forecasts during snapshot load:", fcErr);
         }
+
+        // 4. Pull live persistent activities and notifications for authenticated user
+        if (authUser) {
+          try {
+            const [liveAct, liveNotifs, unread] = await Promise.all([
+              api.listActivities({ limit: 40 }),
+              api.listNotifications({ limit: 20 }),
+              api.getUnreadNotificationCount(),
+            ]);
+            if (Array.isArray(liveAct) && liveAct.length > 0) {
+              data.activity = liveAct;
+            }
+            if (Array.isArray(liveNotifs) && liveNotifs.length > 0) {
+              setServerNotifications(
+                liveNotifs.map((n) => ({
+                  id: n.id,
+                  title: n.title,
+                  body: n.body || n.message || "",
+                  at: n.at,
+                  kind: (n.kind as any) || "activity",
+                  farmId: n.farmId,
+                  cropId: n.cropId,
+                }))
+              );
+            }
+            setServerUnreadCount(unread);
+          } catch (actErr) {
+            console.warn("[HarvestWindow API] Unable to fetch live activities/notifications:", actErr);
+          }
+        }
       }
 
       setReady(true);
@@ -267,6 +299,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   }, [intelligence.weather, liveWeather]);
 
   const notifications = useMemo<AppNotification[]>(() => {
+    if (serverNotifications.length > 0) {
+      return serverNotifications;
+    }
+
     const out: AppNotification[] = [];
 
     for (const farm of snapshot.farms) {
@@ -299,12 +335,14 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     return out.sort(
       (a, b) => new Date(b.at).getTime() - new Date(a.at).getTime()
     ).slice(0, 8);
-  }, [snapshot.farms, snapshot.activity, intelligence.weather]);
+  }, [serverNotifications, snapshot.farms, snapshot.activity, mergedWeather]);
 
-  const unreadCount = useMemo(
-    () => notifications.filter((n) => !readNotificationIds.includes(n.id)).length,
-    [notifications, readNotificationIds]
-  );
+  const unreadCount = useMemo(() => {
+    if (serverUnreadCount !== null) {
+      return serverUnreadCount;
+    }
+    return notifications.filter((n) => !readNotificationIds.includes(n.id)).length;
+  }, [serverUnreadCount, notifications, readNotificationIds]);
 
   const pushActivity = useCallback(
     (event: ActivityEvent) =>
@@ -371,11 +409,43 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
               ? userSnapshot.recommendations
               : userSnapshot.recommendations.filter((r) => farmIdSet.has(r.farmId));
 
+        let liveAct: ActivityEvent[] = [];
+        if (!isDemo && API_CONFIG.mode === "live") {
+          try {
+            void api.syncAlerts().catch(() => {});
+            const [acts, notifs, unread] = await Promise.all([
+              api.listActivities({ limit: 40 }),
+              api.listNotifications({ limit: 20 }),
+              api.getUnreadNotificationCount(),
+            ]);
+            if (Array.isArray(acts) && acts.length > 0) {
+              liveAct = acts;
+            }
+            if (Array.isArray(notifs) && notifs.length > 0) {
+              setServerNotifications(
+                notifs.map((n) => ({
+                  id: n.id,
+                  title: n.title,
+                  body: n.body || n.message || "",
+                  at: n.at,
+                  kind: (n.kind as any) || "activity",
+                  farmId: n.farmId,
+                  cropId: n.cropId,
+                }))
+              );
+            }
+            setServerUnreadCount(unread);
+          } catch (actErr) {
+            console.warn("[AppStore] Could not fetch live activities/notifications on sign-in:", actErr);
+          }
+        }
+
         const updatedSnapshot: PersistedSnapshot = {
           ...userSnapshot,
           farms: liveFarms,
           crops: validCrops,
           recommendations: validRecs,
+          activity: liveAct.length > 0 ? liveAct : userSnapshot.activity,
           signedIn: true,
           user: {
             fullName: result.user.name,
@@ -496,6 +566,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(() => {
     void authClient.logout();
     setAuthToken(null);
+    setServerNotifications([]);
+    setServerUnreadCount(null);
     const loggedOutSnap = buildSeedSnapshot();
     loggedOutSnap.signedIn = false;
     setSnapshot(loggedOutSnap);
@@ -1021,6 +1093,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
   const markNotificationsRead = useCallback(() => {
     setReadNotificationIds(notifications.map((n) => n.id));
+    setServerUnreadCount(0);
+    if (API_CONFIG.mode === "live") {
+      void api.markAllNotificationsRead().catch(() => {});
+    }
   }, [notifications]);
 
   const value = useMemo<StoreValue>(

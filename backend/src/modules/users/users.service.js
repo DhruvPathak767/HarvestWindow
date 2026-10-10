@@ -1,5 +1,6 @@
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../middleware/errorHandler.js";
+import { logActivity } from "../activity/activity.service.js";
 
 const SAFE_USER_SELECT = {
   id: true,
@@ -29,6 +30,15 @@ export class UsersService {
       data: allowedData,
       select: SAFE_USER_SELECT,
     });
+
+    await logActivity({
+      userId,
+      type: "profile-updated",
+      title: "Profile updated",
+      message: `Profile updated: ${updated.name}`,
+      entityType: "user",
+      entityId: userId,
+    }).catch(() => null);
 
     return updated;
   }

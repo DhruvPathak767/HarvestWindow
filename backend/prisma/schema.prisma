@@ -33,6 +33,8 @@ model User {
   refreshSessions RefreshSession[]
   farms           Farm[]
   recommendations Recommendation[]
+  activities      Activity[]
+  notifications   Notification[]
 
   @@index([role])
   @@map("users")
@@ -77,6 +79,8 @@ model Farm {
   user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   crops            Crop[]
   recommendations  Recommendation[]
+  activities       Activity[]
+  notifications    Notification[]
 
   @@index([userId])
   @@map("farms")
@@ -101,6 +105,8 @@ model Crop {
 
   farm                Farm             @relation(fields: [farmId], references: [id], onDelete: Cascade)
   recommendations     Recommendation[]
+  activities          Activity[]
+  notifications       Notification[]
 
   @@index([farmId])
   @@index([cropName])
@@ -137,5 +143,56 @@ model Recommendation {
   @@index([farmId])
   @@index([cropId])
   @@map("recommendations")
+}
+
+// Activity model for Phase 9 Activity Feed
+model Activity {
+  id          String   @id @default(cuid())
+  userId      String   @db.VarChar(191)
+  type        String   @db.VarChar(60)
+  title       String   @db.VarChar(255)
+  message     String   @db.Text
+  entityType  String?  @db.VarChar(50)
+  entityId    String?  @db.VarChar(191)
+  farmId      String?  @db.VarChar(191)
+  cropId      String?  @db.VarChar(191)
+  metadata    String?  @db.Text
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  farm        Farm?    @relation(fields: [farmId], references: [id], onDelete: SetNull)
+  crop        Crop?    @relation(fields: [cropId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([userId, type])
+  @@index([farmId])
+  @@index([cropId])
+  @@map("activities")
+}
+
+// Notification model for Phase 9 In-App Alerts & Notifications
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String    @db.VarChar(191)
+  type      String    @db.VarChar(50) // "weather" | "forecast" | "activity" | "recommendation"
+  title     String    @db.VarChar(255)
+  message   String    @db.Text
+  isRead    Boolean   @default(false)
+  readAt    DateTime?
+  link      String?   @db.VarChar(255)
+  farmId    String?   @db.VarChar(191)
+  cropId    String?   @db.VarChar(191)
+  metadata  String?   @db.Text
+  createdAt DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  farm      Farm?     @relation(fields: [farmId], references: [id], onDelete: SetNull)
+  crop      Crop?     @relation(fields: [cropId], references: [id], onDelete: SetNull)
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+  @@index([farmId])
+  @@index([cropId])
+  @@map("notifications")
 }
 

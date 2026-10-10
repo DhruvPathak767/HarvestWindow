@@ -1,25 +1,36 @@
 import { motion, useReducedMotion } from "framer-motion";
 import {
   CheckCircle2,
+  CloudRain,
   ListChecks,
   PlusCircle,
   RefreshCw,
   SlidersHorizontal,
   Tractor,
+  Trash2,
+  User,
 } from "lucide-react";
-import type { ActivityEvent, ActivityType } from "@/types";
+import type { ActivityEvent } from "@/types";
 import { relativeTime } from "@/utils/date";
 import { EmptyState } from "@/components/common/ui";
 import { cn } from "@/utils/cn";
 
-const ICONS: Record<ActivityType, { icon: typeof RefreshCw; tone: string }> = {
+const DEFAULT_ICON = { icon: RefreshCw, tone: "bg-soft text-forest" };
+
+const ICONS: Record<string, { icon: typeof RefreshCw; tone: string }> = {
   "crop-added": { icon: PlusCircle, tone: "bg-soft text-forest" },
+  "crop-updated": { icon: SlidersHorizontal, tone: "bg-soft text-forest" },
+  "crop-deleted": { icon: Trash2, tone: "bg-[#faeceb] text-danger" },
   "farm-added": { icon: Tractor, tone: "bg-[#f2e9e2] text-earth" },
   "farm-updated": { icon: SlidersHorizontal, tone: "bg-[#f2e9e2] text-earth" },
+  "farm-deleted": { icon: Trash2, tone: "bg-[#faeceb] text-danger" },
   "forecast-refreshed": { icon: RefreshCw, tone: "bg-[#e6eef4] text-info" },
   "window-changed": { icon: SlidersHorizontal, tone: "bg-gold-soft/70 text-[#8a6415]" },
   "recommendation-generated": { icon: ListChecks, tone: "bg-soft text-forest" },
   "recommendation-completed": { icon: CheckCircle2, tone: "bg-[#eaf1e2] text-living" },
+  "recommendation-dismissed": { icon: CheckCircle2, tone: "bg-[#f3f4f6] text-muted" },
+  "weather-alert": { icon: CloudRain, tone: "bg-[#e6eef4] text-info" },
+  "profile-updated": { icon: User, tone: "bg-soft text-forest" },
 };
 
 export function ActivityFeed({
@@ -46,7 +57,7 @@ export function ActivityFeed({
   return (
     <ol className={cn("flex flex-col", className)}>
       {visible.map((event, i) => {
-        const meta = ICONS[event.type];
+        const meta = ICONS[event.type] || DEFAULT_ICON;
         const Icon = meta.icon;
         return (
           <motion.li

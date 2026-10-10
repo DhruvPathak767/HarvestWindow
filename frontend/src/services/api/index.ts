@@ -1,6 +1,7 @@
 import type {
   ActivityEvent,
   AppSettings,
+  BackendNotification,
   Crop,
   Farm,
   Forecast,
@@ -228,6 +229,23 @@ export interface HarvestWindowApi {
     id: string,
     status: RecommendationStatus
   ): Promise<{ id: string; status: RecommendationStatus }>;
+  listActivities(params?: {
+    page?: number;
+    limit?: number;
+    type?: string;
+    farmId?: string;
+    cropId?: string;
+  }): Promise<ActivityEvent[]>;
+  listNotifications(params?: {
+    page?: number;
+    limit?: number;
+    isRead?: boolean;
+    type?: string;
+  }): Promise<BackendNotification[]>;
+  getUnreadNotificationCount(): Promise<number>;
+  markNotificationRead(id: string): Promise<BackendNotification>;
+  markAllNotificationsRead(): Promise<{ updatedCount: number }>;
+  syncAlerts(): Promise<{ generated: number }>;
   saveSettings(settings: AppSettings): Promise<AppSettings>;
   resetDemoData(): Promise<PersistedSnapshot>;
 }
@@ -910,6 +928,101 @@ export const api: HarvestWindowApi = {
       data: any;
     }>(`/weather/current?latitude=${latitude}&longitude=${longitude}`);
     return res.data;
+  },
+
+  async listActivities(params) {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const q = new URLSearchParams();
+        if (params?.page) q.set("page", String(params.page));
+        if (params?.limit) q.set("limit", String(params.limit));
+        if (params?.type) q.set("type", params.type);
+        if (params?.farmId) q.set("farmId", params.farmId);
+        if (params?.cropId) q.set("cropId", params.cropId);
+        const query = q.toString() ? `?${q.toString()}` : "";
+        const res = await apiRequest<{ success: boolean; data: any }>(`/activity${query}`);
+        if (Array.isArray(res?.data)) return res.data;
+        if (Array.isArray(res?.data?.items)) return res.data.items;
+      } catch (err) {
+        console.warn("[HarvestWindow API] listActivities live request failed:", err);
+      }
+    }
+    const snap = localStore.load() ?? buildSeedSnapshot();
+    return snap.activity || [];
+  },
+
+  async listNotifications(params) {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const q = new URLSearchParams();
+        if (params?.page) q.set("page", String(params.page));
+        if (params?.limit) q.set("limit", String(params.limit));
+        if (typeof params?.isRead === "boolean") q.set("isRead", String(params.isRead));
+        if (params?.type) q.set("type", params.type);
+        const query = q.toString() ? `?${q.toString()}` : "";
+        const res = await apiRequest<{ success: boolean; data: any; items?: any[] }>(`/notifications${query}`);
+        if (Array.isArray(res?.data)) return res.data;
+        if (Array.isArray(res?.data?.items)) return res.data.items;
+        if (Array.isArray(res?.items)) return res.items;
+      } catch (err) {
+        console.warn("[HarvestWindow API] listNotifications live request failed:", err);
+      }
+    }
+    return [];
+  },
+
+  async getUnreadNotificationCount() {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const res = await apiRequest<{ success: boolean; data?: { unreadCount: number }; unreadCount?: number }>("/notifications/unread-count");
+        return res?.unreadCount ?? res?.data?.unreadCount ?? 0;
+      } catch (err) {
+        console.warn("[HarvestWindow API] getUnreadNotificationCount failed:", err);
+      }
+    }
+    return 0;
+  },
+
+  async markNotificationRead(id: string) {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const res = await apiRequest<{ success: boolean; data: BackendNotification }>(`/notifications/${id}/read`, {
+          method: "PATCH",
+        });
+        return res.data;
+      } catch (err) {
+        console.warn("[HarvestWindow API] markNotificationRead failed:", err);
+      }
+    }
+    return { id, isRead: true } as BackendNotification;
+  },
+
+  async markAllNotificationsRead() {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const res = await apiRequest<{ success: boolean; data: { updatedCount: number } }>("/notifications/read-all", {
+          method: "PATCH",
+        });
+        return res.data;
+      } catch (err) {
+        console.warn("[HarvestWindow API] markAllNotificationsRead failed:", err);
+      }
+    }
+    return { updatedCount: 0 };
+  },
+
+  async syncAlerts() {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const res = await apiRequest<{ success: boolean; data: { generated: number } }>("/notifications/sync-alerts", {
+          method: "POST",
+        });
+        return res.data;
+      } catch (err) {
+        console.warn("[HarvestWindow API] syncAlerts failed:", err);
+      }
+    }
+    return { generated: 0 };
   },
 };
 

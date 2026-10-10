@@ -1,5 +1,6 @@
 import prisma from "../../config/prisma.js";
 import { AppError } from "../../middleware/errorHandler.js";
+import { logActivity } from "../activity/activity.service.js";
 
 /**
  * Normalizes a Prisma Crop model into the API contract expected by both
@@ -224,7 +225,20 @@ export async function createCrop(userId, input) {
     },
   });
 
-  return formatCrop(created);
+  const formatted = formatCrop(created);
+
+  await logActivity({
+    userId,
+    type: "crop-added",
+    title: `Crop added: ${created.cropName}`,
+    message: `${created.cropName} added to ${created.farm?.name || "farm"}`,
+    entityType: "crop",
+    entityId: created.id,
+    farmId: created.farmId,
+    cropId: created.id,
+  }).catch(() => null);
+
+  return formatted;
 }
 
 /**
@@ -330,7 +344,20 @@ export async function updateCrop(userId, cropId, input) {
     },
   });
 
-  return formatCrop(updated);
+  const formatted = formatCrop(updated);
+
+  await logActivity({
+    userId,
+    type: "crop-updated",
+    title: `Crop updated: ${updated.cropName}`,
+    message: `Updated crop details for ${updated.cropName}`,
+    entityType: "crop",
+    entityId: updated.id,
+    farmId: updated.farmId,
+    cropId: updated.id,
+  }).catch(() => null);
+
+  return formatted;
 }
 
 /**
@@ -356,6 +383,16 @@ export async function deleteCrop(userId, cropId) {
       403
     );
   }
+
+  await logActivity({
+    userId,
+    type: "crop-deleted",
+    title: `Crop removed: ${existing.cropName}`,
+    message: `Removed crop record '${existing.cropName}'`,
+    entityType: "crop",
+    entityId: existing.id,
+    farmId: existing.farmId,
+  }).catch(() => null);
 
   await prisma.crop.delete({
     where: { id: cropId },

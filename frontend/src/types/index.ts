@@ -194,20 +194,47 @@ export interface Recommendation {
 
 export type ActivityType =
   | "crop-added"
+  | "crop-updated"
+  | "crop-deleted"
   | "farm-added"
   | "farm-updated"
+  | "farm-deleted"
   | "forecast-refreshed"
   | "window-changed"
   | "recommendation-generated"
-  | "recommendation-completed";
+  | "recommendation-completed"
+  | "recommendation-dismissed"
+  | "weather-alert"
+  | "profile-updated"
+  | string;
 
 export interface ActivityEvent {
   id: string;
   type: ActivityType;
   message: string;
   at: string; // ISO timestamp
+  title?: string;
   farmId?: string;
   cropId?: string;
+  entityType?: string;
+  entityId?: string;
+}
+
+export interface BackendNotification {
+  id: string;
+  title: string;
+  body: string;
+  message?: string;
+  at: string;
+  createdAt?: string;
+  kind: "weather" | "forecast" | "activity" | "recommendation" | string;
+  type?: string;
+  isRead: boolean;
+  readAt?: string | null;
+  link?: string;
+  farmId?: string;
+  cropId?: string;
+  metadata?: any;
 }
 
 export interface UserProfile {
