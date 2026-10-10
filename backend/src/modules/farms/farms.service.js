@@ -8,13 +8,16 @@ export function formatFarm(farm) {
   if (!farm) return null;
   return {
     id: farm.id,
+    userId: farm.userId,
     name: farm.name,
     state: farm.state,
     district: farm.district,
+    villageOrTaluka: farm.villageOrTaluka || null,
+    village: farm.villageOrTaluka || null,
+    postalCode: farm.postalCode || null,
+    pincode: farm.postalCode || null,
     soilType: farm.soilType || null,
     irrigationSource: farm.irrigationSource || null,
-    village: farm.village || null,
-    pincode: farm.pincode || null,
     latitude:
       farm.latitude !== null && farm.latitude !== undefined
         ? Number(farm.latitude)
@@ -24,7 +27,8 @@ export function formatFarm(farm) {
         ? Number(farm.longitude)
         : null,
     area: Number(farm.area),
-    areaUnit: farm.areaUnit,
+    areaUnit: farm.areaUnit === "ACRE" ? "acre" : "hectare",
+    rawAreaUnit: farm.areaUnit,
     notes: farm.notes || null,
     createdAt:
       farm.createdAt instanceof Date
@@ -43,6 +47,10 @@ export function formatFarm(farm) {
  * @param {string} userId
  */
 export async function listFarms(userId) {
+  if (!userId || typeof userId !== "string") {
+    return [];
+  }
+
   const records = await prisma.farm.findMany({
     where: { userId },
     orderBy: { createdAt: "desc" },
@@ -58,6 +66,10 @@ export async function listFarms(userId) {
  * @param {string} farmId
  */
 export async function getFarmById(userId, farmId) {
+  if (!userId || typeof userId !== "string" || !farmId) {
+    return null;
+  }
+
   const farm = await prisma.farm.findFirst({
     where: {
       id: farmId,
@@ -75,6 +87,10 @@ export async function getFarmById(userId, farmId) {
  * @param {Object} input
  */
 export async function createFarm(userId, input) {
+  if (!userId || typeof userId !== "string") {
+    throw new Error("Authentication required: userId is missing.");
+  }
+
   // Ensure the user record exists in the database
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -94,20 +110,31 @@ export async function createFarm(userId, input) {
     });
   }
 
+  const villageOrTaluka = input.villageOrTaluka || input.village || null;
+  const postalCode = input.postalCode || input.pincode || null;
+  const areaUnit =
+    String(input.areaUnit || "").toUpperCase() === "ACRE" ? "ACRE" : "HECTARE";
+
   const created = await prisma.farm.create({
     data: {
       userId,
       name: input.name,
       state: input.state,
       district: input.district,
+      villageOrTaluka,
+      postalCode,
       soilType: input.soilType || null,
       irrigationSource: input.irrigationSource || null,
-      village: input.village || null,
-      pincode: input.pincode || null,
-      latitude: input.latitude !== undefined ? input.latitude : null,
-      longitude: input.longitude !== undefined ? input.longitude : null,
+      latitude:
+        input.latitude !== undefined && input.latitude !== null
+          ? input.latitude
+          : null,
+      longitude:
+        input.longitude !== undefined && input.longitude !== null
+          ? input.longitude
+          : null,
       area: input.area,
-      areaUnit: input.areaUnit || "hectare",
+      areaUnit,
       notes: input.notes || null,
     },
   });
@@ -123,6 +150,10 @@ export async function createFarm(userId, input) {
  * @param {Object} input
  */
 export async function updateFarm(userId, farmId, input) {
+  if (!userId || typeof userId !== "string" || !farmId) {
+    return null;
+  }
+
   // Verify existence and ownership
   const existing = await prisma.farm.findFirst({
     where: {
@@ -139,14 +170,27 @@ export async function updateFarm(userId, farmId, input) {
   if (input.name !== undefined) updateData.name = input.name;
   if (input.state !== undefined) updateData.state = input.state;
   if (input.district !== undefined) updateData.district = input.district;
+  if (input.villageOrTaluka !== undefined) {
+    updateData.villageOrTaluka = input.villageOrTaluka;
+  } else if (input.village !== undefined) {
+    updateData.villageOrTaluka = input.village;
+  }
+  if (input.postalCode !== undefined) {
+    updateData.postalCode = input.postalCode;
+  } else if (input.pincode !== undefined) {
+    updateData.postalCode = input.pincode;
+  }
   if (input.soilType !== undefined) updateData.soilType = input.soilType;
-  if (input.irrigationSource !== undefined) updateData.irrigationSource = input.irrigationSource;
-  if (input.village !== undefined) updateData.village = input.village;
-  if (input.pincode !== undefined) updateData.pincode = input.pincode;
+  if (input.irrigationSource !== undefined) {
+    updateData.irrigationSource = input.irrigationSource;
+  }
   if (input.latitude !== undefined) updateData.latitude = input.latitude;
   if (input.longitude !== undefined) updateData.longitude = input.longitude;
   if (input.area !== undefined) updateData.area = input.area;
-  if (input.areaUnit !== undefined) updateData.areaUnit = input.areaUnit;
+  if (input.areaUnit !== undefined) {
+    updateData.areaUnit =
+      String(input.areaUnit).toUpperCase() === "ACRE" ? "ACRE" : "HECTARE";
+  }
   if (input.notes !== undefined) updateData.notes = input.notes;
 
   const updated = await prisma.farm.update({
@@ -164,6 +208,10 @@ export async function updateFarm(userId, farmId, input) {
  * @param {string} farmId
  */
 export async function deleteFarm(userId, farmId) {
+  if (!userId || typeof userId !== "string" || !farmId) {
+    return null;
+  }
+
   const existing = await prisma.farm.findFirst({
     where: {
       id: farmId,

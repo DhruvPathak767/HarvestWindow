@@ -208,4 +208,69 @@ describe("Phase 2 — Farm Management Module Tests", () => {
       assert.strictEqual(body.status, "ok");
     });
   });
+
+  describe("4. Multi-Tenant Farm Isolation & Cross-User Privacy", () => {
+    test("Farms created by User A are strictly inaccessible to User B", async () => {
+      // Create farm under User A
+      const createRes = await fetch(`${baseUrl}/api/farms`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${tokenA}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: "User Alpha Private Orchard",
+          state: "Maharashtra",
+          district: "Nashik",
+          area: 8.5,
+          areaUnit: "hectare",
+        }),
+      });
+
+      // If DB is available (status 201), test isolation
+      if (createRes.status === 201) {
+        const createBody = await createRes.json();
+        const farmId = createBody.data.id;
+
+        // 1. User B lists farms — must not include Alpha's farm
+        const listBRes = await fetch(`${baseUrl}/api/farms`, {
+          headers: { Authorization: `Bearer ${tokenB}` },
+        });
+        assert.strictEqual(listBRes.status, 200);
+        const listBBody = await listBRes.json();
+        const foundInB = listBBody.data.some((f) => f.id === farmId);
+        assert.strictEqual(foundInB, false, "User B must not see User A's farm in list");
+
+        // 2. User B tries to retrieve Alpha's farm by ID — must return 404
+        const getBRes = await fetch(`${baseUrl}/api/farms/${farmId}`, {
+          headers: { Authorization: `Bearer ${tokenB}` },
+        });
+        assert.strictEqual(getBRes.status, 404, "User B must receive 404 when requesting User A's farm ID");
+
+        // 3. User B tries to update Alpha's farm — must return 404
+        const updateBRes = await fetch(`${baseUrl}/api/farms/${farmId}`, {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${tokenB}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ name: "Hacked Orchard Name" }),
+        });
+        assert.strictEqual(updateBRes.status, 404, "User B must receive 404 when updating User A's farm");
+
+        // 4. User B tries to delete Alpha's farm — must return 404
+        const deleteBRes = await fetch(`${baseUrl}/api/farms/${farmId}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${tokenB}` },
+        });
+        assert.strictEqual(deleteBRes.status, 404, "User B must receive 404 when deleting User A's farm");
+
+        // Clean up: User A deletes own farm
+        await fetch(`${baseUrl}/api/farms/${farmId}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${tokenA}` },
+        });
+      }
+    });
+  });
 });

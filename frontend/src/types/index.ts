@@ -25,19 +25,23 @@ export type RecommendationStatus = "open" | "completed" | "dismissed";
 
 export interface Farm {
   id: string;
+  userId?: string;
   name: string;
   state: string;
   district: string;
+  villageOrTaluka?: string | null;
+  village?: string | null;
+  postalCode?: string | null;
+  pincode?: string | null;
   soilType?: string | null;
   irrigationSource?: string | null;
-  village?: string | null;
-  pincode?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   area: number;
-  areaUnit: AreaUnit;
+  areaUnit: AreaUnit | string;
   notes?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface Crop {

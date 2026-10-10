@@ -8,10 +8,12 @@ import type {
   WeatherSummary,
 } from "@/types";
 import {
+  buildEmptySnapshot,
   buildSeedSnapshot,
   localStore,
   type PersistedSnapshot,
 } from "@/services/storage/localStore";
+import { DEMO_CREDENTIALS } from "@/data/mock/seed";
 import { weatherService } from "@/services/weather/weatherService";
 import { computeForecasts } from "@/services/forecast/forecastService";
 
@@ -117,7 +119,9 @@ export interface NewFarmInput {
   district: string;
   soilType?: string | null;
   irrigationSource?: string | null;
+  villageOrTaluka?: string | null;
   village?: string | null;
+  postalCode?: string | null;
   pincode?: string | null;
   latitude?: number | null;
   longitude?: number | null;
@@ -132,7 +136,9 @@ export interface UpdateFarmInput {
   district?: string;
   soilType?: string | null;
   irrigationSource?: string | null;
+  villageOrTaluka?: string | null;
   village?: string | null;
+  postalCode?: string | null;
   pincode?: string | null;
   latitude?: number | null;
   longitude?: number | null;
@@ -176,7 +182,7 @@ const nextId = (prefix: string) =>
 
 /** Contract shared by demo implementation and live HTTP client. */
 export interface HarvestWindowApi {
-  loadSnapshot(): Promise<PersistedSnapshot>;
+  loadSnapshot(userEmailOrId?: string | null): Promise<PersistedSnapshot>;
   listFarms(): Promise<Farm[]>;
   getFarm(id: string): Promise<Farm>;
   createFarm(input: NewFarmInput): Promise<{ farm: Farm; activity: ActivityEvent }>;
@@ -202,8 +208,11 @@ export interface HarvestWindowApi {
 }
 
 export const api: HarvestWindowApi = {
-  async loadSnapshot() {
-    const baseSnapshot = localStore.load() ?? buildSeedSnapshot();
+  async loadSnapshot(userEmailOrId?: string | null) {
+    const isDemo = !userEmailOrId || userEmailOrId === DEMO_CREDENTIALS.email;
+    const baseSnapshot =
+      localStore.load(userEmailOrId) ??
+      (isDemo ? buildSeedSnapshot() : buildEmptySnapshot({ email: userEmailOrId || "" }));
 
     if (API_CONFIG.mode === "live") {
       try {
@@ -215,8 +224,14 @@ export const api: HarvestWindowApi = {
           console.warn("[HarvestWindow API] Unable to fetch live crops during snapshot load:", cropErr);
         }
 
-        const farmsToUse = Array.isArray(liveFarms) && liveFarms.length > 0 ? liveFarms : baseSnapshot.farms;
-        const cropsToUse = Array.isArray(liveCrops) && liveCrops.length > 0 ? liveCrops : baseSnapshot.crops;
+        const farmsToUse = Array.isArray(liveFarms) ? liveFarms : baseSnapshot.farms;
+        const farmIdSet = new Set(farmsToUse.map((f) => f.id));
+        const cropsToUse =
+          Array.isArray(liveCrops) && liveCrops.length > 0
+            ? liveCrops
+            : isDemo
+              ? baseSnapshot.crops
+              : baseSnapshot.crops.filter((c) => farmIdSet.has(c.farmId));
 
         return {
           ...baseSnapshot,
@@ -225,14 +240,15 @@ export const api: HarvestWindowApi = {
         };
       } catch (err) {
         console.warn(
-          "[HarvestWindow API] Unable to fetch live farms during snapshot load, using cached demo data:",
+          "[HarvestWindow API] Unable to fetch live farms during snapshot load, using cached data:",
           err
         );
-        return baseSnapshot;
       }
     }
 
-    await wait(300);
+    if (isDemo) {
+      await wait(300);
+    }
     return baseSnapshot;
   },
 
@@ -240,9 +256,12 @@ export const api: HarvestWindowApi = {
     if (API_CONFIG.mode === "live") {
       try {
         const res = await apiRequest<{ success: boolean; data: Farm[] }>("/farms");
-        return res.data;
+        if (Array.isArray(res?.data)) {
+          return res.data;
+        }
       } catch (err) {
-        console.warn("[HarvestWindow API] listFarms live request failed, using local store:", err);
+        console.warn("[HarvestWindow API] listFarms live request failed:", err);
+        throw err;
       }
     }
     const snap = localStore.load() ?? buildSeedSnapshot();
@@ -255,7 +274,8 @@ export const api: HarvestWindowApi = {
         const res = await apiRequest<{ success: boolean; data: Farm }>(`/farms/${id}`);
         return res.data;
       } catch (err) {
-        console.warn(`[HarvestWindow API] getFarm live request failed for ${id}, using local store:`, err);
+        console.warn(`[HarvestWindow API] getFarm live request failed for ${id}:`, err);
+        throw err;
       }
     }
     const snap = localStore.load() ?? buildSeedSnapshot();
@@ -272,11 +292,6 @@ export const api: HarvestWindowApi = {
           body: JSON.stringify(input),
         });
         const farm = res.data;
-        const snap = localStore.load() ?? buildSeedSnapshot();
-        if (!snap.farms.some((f) => f.id === farm.id)) {
-          snap.farms.push(farm);
-          localStore.save(snap);
-        }
         return {
           farm,
           activity: {
