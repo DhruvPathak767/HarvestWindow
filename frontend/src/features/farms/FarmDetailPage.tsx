@@ -36,6 +36,7 @@ export default function FarmDetailPage() {
     selectFarm,
     fetchFarm,
     deleteFarm,
+    fetchFarmWeather,
   } = useStore();
 
   const [addOpen, setAddOpen] = useState(false);
@@ -54,6 +55,19 @@ export default function FarmDetailPage() {
       fetchFarm(farmId).finally(() => setLoading(false));
     }
   }, [farm, farmId, fetchFarm]);
+
+  // Fetch live Open-Meteo weather when farm has coordinates
+  useEffect(() => {
+    if (
+      farm &&
+      farm.latitude !== null &&
+      farm.longitude !== null &&
+      farm.latitude !== undefined &&
+      farm.longitude !== undefined
+    ) {
+      void fetchFarmWeather(farm.id);
+    }
+  }, [farm, fetchFarmWeather]);
 
   const farmCrops = useMemo(
     () => (farm ? crops.filter((c) => c.farmId === farm.id) : []),

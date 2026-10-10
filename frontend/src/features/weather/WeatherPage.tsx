@@ -1,14 +1,18 @@
-import { useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   CalendarRange,
+  CheckCircle2,
   CloudRain,
   CloudSun,
+  Compass,
   Droplets,
   Info,
+  LocateFixed,
   MapPin,
   Plug,
+  RotateCw,
   Sprout,
   Sun,
   Thermometer,
@@ -20,6 +24,7 @@ import { Badge, Button, Card, CardHeader, EmptyState } from "@/components/common
 import { WeatherChart } from "@/components/charts/WeatherChart";
 import { ALL_FARMS, useStore } from "@/store/AppStore";
 import { CONDITION_LABEL } from "@/services/weather/weatherService";
+import { detectBrowserLocation } from "@/services/location/geolocationService";
 import { formatDate, formatWeekday, relativeTime } from "@/utils/date";
 import { cn } from "@/utils/cn";
 
@@ -32,23 +37,65 @@ const CONDITION_ICON: Record<string, typeof Sun> = {
 };
 
 export default function WeatherPage() {
-  const { farms, crops, forecasts, weather, selectedFarmId, selectFarm } = useStore();
+  const {
+    farms,
+    crops,
+    forecasts,
+    weather,
+    weatherLoading,
+    selectedFarmId,
+    selectFarm,
+    fetchFarmWeather,
+    updateFarm,
+  } = useStore();
   const navigate = useNavigate();
+
+  const [locatingFarm, setLocatingFarm] = useState(false);
+  const [locateSuccess, setLocateSuccess] = useState<string | null>(null);
+  const [locateError, setLocateError] = useState<string | null>(null);
 
   const activeFarm =
     farms.find((f) => f.id === selectedFarmId) ?? farms[0] ?? null;
   const summary = activeFarm ? weather[activeFarm.id] : null;
 
+  const handleDetectAndSaveLocation = async () => {
+    if (!activeFarm) return;
+    setLocatingFarm(true);
+    setLocateError(null);
+    setLocateSuccess(null);
+    try {
+      const loc = await detectBrowserLocation();
+      await updateFarm(activeFarm.id, {
+        latitude: loc.latitude,
+        longitude: loc.longitude,
+        state: loc.state || activeFarm.state,
+        district: loc.district || activeFarm.district,
+        village: loc.village || activeFarm.village,
+        pincode: loc.pincode || activeFarm.pincode,
+      });
+      await fetchFarmWeather(activeFarm.id, true);
+      setLocateSuccess(`Location locked: ${loc.latitude.toFixed(4)}°, ${loc.longitude.toFixed(4)}°. Live Open-Meteo feed connected!`);
+    } catch (err: unknown) {
+      setLocateError(
+        err instanceof Error
+          ? err.message
+          : "Failed to detect live location. Please check browser permissions."
+      );
+    } finally {
+      setLocatingFarm(false);
+    }
+  };
+
   const overlaps = useMemo(() => {
-    if (!activeFarm || !summary) return [];
+    if (!activeFarm || !summary || !Array.isArray(summary.daily)) return [];
     const wetDates = new Set(
-      summary.daily.filter((d) => d.rainfallMm >= 8).map((d) => d.date)
+      summary.daily.filter((d) => (d.rainfallMm || 0) >= 8).map((d) => d.date)
     );
-    return crops
-      .filter((c) => c.farmId === activeFarm.id)
+    return (crops || [])
+      .filter((c) => c && c.farmId === activeFarm.id)
       .map((crop) => {
-        const forecast = forecasts[crop.id];
-        if (!forecast) return null;
+        const forecast = forecasts?.[crop.id];
+        if (!forecast || !forecast.estimatedWindowStart || !forecast.estimatedWindowEnd) return null;
         const inRange = [...wetDates].filter(
           (date) =>
             date >= forecast.estimatedWindowStart && date <= forecast.estimatedWindowEnd
@@ -72,7 +119,7 @@ export default function WeatherPage() {
         <EmptyState
           icon={<CloudRain className="h-5 w-5" aria-hidden />}
           title="No farm with a weather dataset"
-          description="Add a farm to attach the demo weather dataset, then harvest-related cautions appear here."
+          description="Add a farm with location context to view 10-day Open-Meteo forecasts and harvest cautions."
           action={
             <Button size="sm" onClick={() => navigate("/app/farms")}>
               Go to farms
@@ -83,18 +130,26 @@ export default function WeatherPage() {
     );
   }
 
+  const daily = Array.isArray(summary.daily) ? summary.daily : [];
+  const cautions = Array.isArray(summary.cautions) ? summary.cautions : [];
   const Icon = CONDITION_ICON[summary.condition] ?? CloudSun;
-  const totalRain = summary.daily.reduce((s, d) => s + d.rainfallMm, 0);
-  const avgMax = Math.round(
-    summary.daily.reduce((s, d) => s + d.maxTempC, 0) / summary.daily.length
-  );
+  const totalRain = daily.reduce((s, d) => s + (d.rainfallMm || 0), 0);
+  const avgMax = daily.length > 0
+    ? Math.round(daily.reduce((s, d) => s + (d.maxTempC || 0), 0) / daily.length)
+    : (summary.temperatureC || 28);
+
+  const hasCoords =
+    activeFarm.latitude !== null &&
+    activeFarm.longitude !== null &&
+    activeFarm.latitude !== undefined &&
+    activeFarm.longitude !== undefined;
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         eyebrow="Weather intelligence"
         title={`Weather context · ${summary.locationLabel}`}
-        subtitle="Read against your harvest windows rather than as a standalone forecast. Wet days that fall inside a window are called out per crop."
+        subtitle="Read against your harvest windows rather than as a standalone forecast. Wet days and temperature extremes that fall inside a window are called out per crop."
         meta={[
           {
             icon: <MapPin className="h-3.5 w-3.5" aria-hidden />,
@@ -103,7 +158,11 @@ export default function WeatherPage() {
               <select
                 aria-label="Select farm for weather"
                 value={selectedFarmId === ALL_FARMS ? activeFarm.id : selectedFarmId}
-                onChange={(e) => selectFarm(e.target.value)}
+                onChange={(e) => {
+                  selectFarm(e.target.value);
+                  setLocateSuccess(null);
+                  setLocateError(null);
+                }}
                 className="rounded-sm border border-line bg-white px-2 py-1 font-display text-[12.5px] font-semibold text-forest-deep outline-none focus:border-forest"
               >
                 {farms.map((f) => (
@@ -118,11 +177,73 @@ export default function WeatherPage() {
           { label: "Source", value: summary.sourceLabel },
         ]}
         actions={
-          <Badge tone="info" icon={<Info className="h-3 w-3" aria-hidden />}>
-            Demo dataset · not a live feed
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => void fetchFarmWeather(activeFarm.id, true)}
+              loading={weatherLoading}
+              aria-label="Refresh weather data"
+            >
+              <RotateCw className="h-3.5 w-3.5 mr-1" aria-hidden />
+              Refresh
+            </Button>
+            {summary.sourceType === "live-provider" ? (
+              <Badge tone="success" icon={<Plug className="h-3 w-3" aria-hidden />}>
+                {summary.sourceLabel?.includes("WeatherAPI") ? "Live WeatherAPI.com" : "Live Weather Feed"}
+              </Badge>
+            ) : (
+              <Badge tone="info" icon={<Info className="h-3 w-3" aria-hidden />}>
+                Demo baseline
+              </Badge>
+            )}
+          </div>
         }
       />
+
+      {/* Missing Coordinates Notification Banner with Live Location Action */}
+      {!hasCoords && (
+        <div className="rounded-lg border border-gold/50 bg-gradient-to-r from-cream via-[#fbf7ee] to-gold/15 p-4 shadow-xs">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-forest text-cream shadow-xs">
+                <LocateFixed className="h-4 w-4" aria-hidden />
+              </span>
+              <div>
+                <p className="font-display text-[13.5px] font-bold text-forest-deep">
+                  Enable Live Open-Meteo Forecast for {activeFarm.name}
+                </p>
+                <p className="text-[12px] leading-relaxed text-muted">
+                  This farm is missing saved GPS coordinates. Detect device location using the Browser Geolocation API to connect real-time 10-day forecasts and harvest alerts.
+                </p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={handleDetectAndSaveLocation}
+              loading={locatingFarm}
+              className="shrink-0 font-medium"
+            >
+              <Compass className="h-3.5 w-3.5 mr-1" aria-hidden />
+              Detect & Save Location
+            </Button>
+          </div>
+          {locateSuccess && (
+            <div className="mt-3 flex items-center gap-1.5 rounded-md border border-living/30 bg-living/10 px-3 py-1.5 text-[12px] font-medium text-forest-deep">
+              <CheckCircle2 className="h-3.5 w-3.5 text-living shrink-0" aria-hidden />
+              <span>{locateSuccess}</span>
+            </div>
+          )}
+          {locateError && (
+            <div className="mt-3 flex items-center gap-1.5 rounded-md border border-danger/30 bg-[#fdf1ee] px-3 py-1.5 text-[12px] text-[#8d3a26]">
+              <TriangleAlert className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              <span>{locateError}</span>
+            </div>
+          )}
+        </div>
+      )}
 
       <section aria-label="Current conditions" className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
         <Card className="relative overflow-hidden">
@@ -142,7 +263,7 @@ export default function WeatherPage() {
                   {summary.temperatureC}°
                 </p>
                 <p className="mt-2 font-display text-[14px] font-semibold">
-                  {CONDITION_LABEL[summary.condition]} · feels like {summary.feelsLikeC}°
+                  {(CONDITION_LABEL[summary.condition] || "Partly cloudy")} · feels like {summary.feelsLikeC ?? summary.temperatureC}°
                 </p>
               </div>
               <span className="grid h-14 w-14 place-items-center rounded-full border border-white/15 bg-white/10 text-gold">
@@ -152,9 +273,9 @@ export default function WeatherPage() {
           </div>
           <dl className="grid grid-cols-2 gap-4 p-5">
             {[
-              { icon: Droplets, label: "Humidity", value: `${summary.humidity}%` },
-              { icon: Wind, label: "Wind", value: `${summary.windKph} km/h` },
-              { icon: CloudRain, label: "Rain today", value: `${summary.rainfallMm} mm` },
+              { icon: Droplets, label: "Humidity", value: `${summary.humidity ?? 60}%` },
+              { icon: Wind, label: "Wind", value: `${summary.windKph ?? 10} km/h` },
+              { icon: CloudRain, label: "Rain today", value: `${summary.rainfallMm ?? 0} mm` },
               { icon: Thermometer, label: "10-day avg max", value: `${avgMax}°C` },
             ].map((item) => (
               <div key={item.label} className="rounded-md border border-line bg-cream/60 p-3.5">
@@ -169,7 +290,7 @@ export default function WeatherPage() {
             ))}
           </dl>
           <p className="px-5 pb-5 text-[12.5px] leading-relaxed text-muted">
-            {summary.forecastSummary}
+            {summary.forecastSummary || "HarvestWindow 10-day weather outlook."}
           </p>
         </Card>
 
@@ -180,9 +301,9 @@ export default function WeatherPage() {
             icon={<CalendarRange className="h-4 w-4" aria-hidden />}
           />
           <div className="p-5">
-            <WeatherChart daily={summary.daily} height={240} />
+            <WeatherChart daily={daily} height={240} />
             <div className="hw-scroll-x mt-4 flex gap-2 overflow-x-auto pb-1">
-              {summary.daily.map((d) => {
+              {daily.map((d) => {
                 const DayIcon = CONDITION_ICON[d.condition] ?? CloudSun;
                 return (
                   <motion.div
@@ -223,8 +344,8 @@ export default function WeatherPage() {
             icon={<TriangleAlert className="h-4 w-4" aria-hidden />}
           />
           <div className="flex flex-col gap-3 p-5">
-            {summary.cautions.length > 0 ? (
-              summary.cautions.map((c) => (
+            {cautions.length > 0 ? (
+              cautions.map((c) => (
                 <div
                   key={c.id}
                   className={cn(

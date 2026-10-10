@@ -71,6 +71,17 @@ export function WeatherChart({
   height?: number;
   showRainAxis?: boolean;
 }) {
+  if (!Array.isArray(daily) || daily.length === 0) {
+    return (
+      <div
+        className={cn("flex w-full items-center justify-center rounded-md border border-dashed border-line bg-cream/40 p-6 text-[12px] text-muted", className)}
+        style={{ height }}
+      >
+        No daily forecast records available for chart.
+      </div>
+    );
+  }
+
   const data = daily.map((d) => ({ ...d, label: formatWeekday(d.date) }));
 
   return (

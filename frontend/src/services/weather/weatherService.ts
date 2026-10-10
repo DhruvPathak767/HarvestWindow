@@ -1,20 +1,10 @@
 import type { Farm, WeatherCaution, WeatherDay, WeatherSummary } from "@/types";
 import { WEATHER_PATTERNS } from "@/data/mock/seed";
 import { addDays, startOfToday, toISODate } from "@/utils/date";
+import type { WeatherProvider } from "./weatherTypes";
+import { openMeteoWeatherProvider } from "./openMeteoProvider";
 
-/**
- * Weather provider abstraction.
- *
- * The app only ever talks to `WeatherProvider`, so a real service
- * (for example a meteorological API keyed on farm coordinates) can be
- * registered later without touching UI code.
- */
-export interface WeatherProvider {
-  readonly id: string;
-  readonly label: string;
-  readonly sourceType: WeatherSummary["sourceType"];
-  fetchForFarm(farm: Farm): Promise<WeatherSummary>;
-}
+export type { WeatherProvider };
 
 const NEUTRAL_PATTERN = {
   current: {
@@ -41,7 +31,7 @@ const NEUTRAL_PATTERN = {
   cautions: [] as WeatherCaution[],
 };
 
-class DemoWeatherProvider implements WeatherProvider {
+export class DemoWeatherProvider implements WeatherProvider {
   readonly id = "demo-dataset";
   readonly label = "HarvestWindow demo dataset";
   readonly sourceType = "demo-dataset" as const;
@@ -52,6 +42,25 @@ class DemoWeatherProvider implements WeatherProvider {
 
   /** Synchronous build so the dashboard can render without an extra round-trip. */
   buildForFarm(farm: Farm): WeatherSummary {
+    if (!farm) {
+      return {
+        farmId: "unknown",
+        locationLabel: "Farm Location",
+        observedAt: new Date().toISOString(),
+        temperatureC: 30,
+        feelsLikeC: 32,
+        rainfallMm: 0,
+        humidity: 60,
+        windKph: 10,
+        condition: "partly-cloudy",
+        forecastSummary: "Baseline dataset.",
+        daily: [],
+        cautions: [],
+        sourceType: "demo-dataset",
+        sourceLabel: "Demo baseline",
+      };
+    }
+
     const pattern = WEATHER_PATTERNS.find((p) => p.farmId === farm.id);
     const today = startOfToday();
     const base = pattern ?? NEUTRAL_PATTERN;
@@ -77,7 +86,7 @@ class DemoWeatherProvider implements WeatherProvider {
 
     return {
       farmId: farm.id,
-      locationLabel: pattern?.locationLabel ?? `${farm.district}, ${farm.state}`,
+      locationLabel: pattern?.locationLabel ?? `${farm.district || "Farm"}, ${farm.state || "Region"}`,
       observedAt: new Date(Date.now() - base.current.observedHoursAgo * 3_600_000).toISOString(),
       temperatureC: base.current.temperatureC,
       feelsLikeC: base.current.feelsLikeC,
@@ -98,7 +107,7 @@ class DemoWeatherProvider implements WeatherProvider {
 
 export const demoWeatherProvider = new DemoWeatherProvider();
 
-let activeProvider: WeatherProvider = demoWeatherProvider;
+let activeProvider: WeatherProvider = openMeteoWeatherProvider;
 
 export const weatherService = {
   get provider(): WeatherProvider {
