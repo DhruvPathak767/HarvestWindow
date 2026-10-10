@@ -43,7 +43,7 @@ function formatDateLabel(date) {
  * @param {Date} [params.referenceDate] - Date used as "now" (defaults to current system time)
  * @returns {Array<Object>} List of candidate recommendations
  */
-export function evaluateCropRules({ farm, crop, weather = null, referenceDate = new Date() }) {
+export function evaluateCropRules({ farm, crop, weather = null, forecast = null, referenceDate = new Date() }) {
   if (!crop || !farm) {
     return [];
   }
@@ -174,9 +174,63 @@ export function evaluateCropRules({ farm, crop, weather = null, referenceDate = 
   }
 
   // =========================================================================
-  // Rule D: Harvest Approaching (3 to 10 days remaining)
+  // Rule D & E: Harvest Forecast / Readiness (Integrating Phase 5 Prediction Engine)
   // =========================================================================
-  if (crop.expectedHarvestDate) {
+  const isForecastReady =
+    forecast?.readinessStatus === "READY" ||
+    forecast?.readinessLevel === "READY";
+  const isForecastApproaching =
+    forecast?.readinessStatus === "APPROACHING" ||
+    (typeof forecast?.daysToWindowStart === "number" &&
+      forecast.daysToWindowStart >= 3 &&
+      forecast.daysToWindowStart <= 10);
+
+  if (isForecastReady) {
+    const targetDate =
+      forecast?.harvestWindow?.typicalDate ||
+      forecast?.harvestWindow?.startDate ||
+      crop.expectedHarvestDate;
+    candidates.push({
+      ruleKey: `harvest-ready-${crop.id}`,
+      cropId: crop.id,
+      farmId: farm.id,
+      title: `Confirm harvest readiness for ${crop.cropName}`,
+      reason: `Harvest prediction engine assesses readiness status as READY based on agronomic benchmarks and weather signals (${targetDate ? formatDateLabel(targetDate) : "current window"}). In-field verification is essential.`,
+      suggestedAction: `Conduct in-field maturity inspection across multiple quadrants. If mature, coordinate immediate picking and market dispatch.`,
+      category: "timing",
+      priority: "high",
+      relevantDate: targetDate ? new Date(targetDate) : null,
+      sourceContext: JSON.stringify({
+        rule: "Rule E - Prediction Engine Readiness",
+        readinessStatus: forecast?.readinessStatus,
+        confidence: forecast?.confidence,
+      }),
+    });
+  } else if (isForecastApproaching) {
+    const daysLeft =
+      forecast?.daysToWindowStart ??
+      (crop.expectedHarvestDate ? differenceInCalendarDays(crop.expectedHarvestDate, referenceDate) : 5);
+    const targetDate =
+      forecast?.harvestWindow?.startDate ||
+      crop.expectedHarvestDate;
+    candidates.push({
+      ruleKey: `harvest-approaching-${crop.id}`,
+      cropId: crop.id,
+      farmId: farm.id,
+      title: `Harvest window approaching for ${crop.cropName} (${daysLeft} days remaining)`,
+      reason: `Prediction engine forecasts harvest window opening around ${targetDate ? formatDateLabel(targetDate) : "upcoming days"}. Crop is entering final ripening phase.`,
+      suggestedAction: `Confirm harvesting labor, clean transport crates and storage areas, and conduct sample maturity testing across field quadrants.`,
+      category: "timing",
+      priority: daysLeft <= 5 ? "high" : "medium",
+      relevantDate: targetDate ? new Date(targetDate) : null,
+      sourceContext: JSON.stringify({
+        rule: "Rule D - Prediction Engine Approaching",
+        daysToWindowStart: daysLeft,
+        confidence: forecast?.confidence,
+      }),
+    });
+  } else if (crop.expectedHarvestDate) {
+    // Fallback based on recorded expected harvest date when forecast engine prediction is not ready/approaching
     const daysUntilHarvest = differenceInCalendarDays(crop.expectedHarvestDate, referenceDate);
 
     if (daysUntilHarvest >= 3 && daysUntilHarvest <= 10) {
@@ -198,9 +252,6 @@ export function evaluateCropRules({ farm, crop, weather = null, referenceDate = 
       });
     }
 
-    // =========================================================================
-    // Rule E: Harvest Readiness (within 2 days or up to 7 days past window)
-    // =========================================================================
     if (daysUntilHarvest <= 2 && daysUntilHarvest >= -7) {
       candidates.push({
         ruleKey: `harvest-ready-${crop.id}`,

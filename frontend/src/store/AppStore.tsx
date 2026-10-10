@@ -819,6 +819,16 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           patch((prev) => ({
             ...prev,
             recommendations: res.items,
+            activity: [
+              {
+                id: newActivityId(),
+                type: "recommendation-generated" as const,
+                message: `Refreshed guidance: ${res.items.filter((r) => r.status === "open").length} open actions available`,
+                at: new Date().toISOString(),
+                farmId,
+              },
+              ...prev.activity,
+            ].slice(0, 40),
           }));
           toast({
             tone: "success",

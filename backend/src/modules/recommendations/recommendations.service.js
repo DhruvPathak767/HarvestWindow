@@ -2,6 +2,8 @@ import prisma from "../../config/prisma.js";
 import { AppError } from "../../middleware/errorHandler.js";
 import { getWeatherForFarm } from "../weather/weather.service.js";
 import { evaluateCropRules } from "./recommendations.rules.js";
+import { predictHarvestWindow } from "../forecasts/predictionEngine.js";
+import { buildWeatherContext } from "../forecasts/weatherContext.js";
 
 /**
  * Normalizes recommendation item for API responses and frontend compatibility.
@@ -100,12 +102,31 @@ export async function refreshRecommendations(userId, options = {}) {
       weather = null;
     }
 
-    // Evaluate rules for each crop
+    // Evaluate rules for each crop integrating Phase 5 Prediction Engine
+    let weatherContext = null;
+    try {
+      weatherContext = buildWeatherContext(weather || { farm });
+    } catch {
+      weatherContext = null;
+    }
+
     for (const crop of farm.crops) {
+      let forecast = null;
+      try {
+        forecast = predictHarvestWindow({
+          crop,
+          referenceDate: options.referenceDate || new Date(),
+          weatherContext,
+        });
+      } catch {
+        forecast = null;
+      }
+
       const candidates = evaluateCropRules({
         farm,
         crop,
         weather,
+        forecast,
         referenceDate: options.referenceDate || new Date(),
       });
       allCandidates.push(...candidates);
