@@ -70,7 +70,7 @@ describe("Phase 3 — Crop Management Module Tests", () => {
         state: "Punjab",
         district: "Ludhiana",
         area: 15.0,
-        areaUnit: "hectare",
+        areaUnit: "HECTARE",
       },
     });
 
@@ -81,7 +81,7 @@ describe("Phase 3 — Crop Management Module Tests", () => {
         state: "Rajasthan",
         district: "Alwar",
         area: 8.5,
-        areaUnit: "acre",
+        areaUnit: "ACRE",
       },
     });
 
