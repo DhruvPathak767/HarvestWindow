@@ -32,12 +32,14 @@ export function Modal({
 }: ModalProps) {
   const reduced = useReducedMotion();
   const panelRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   const titleId = `modal-title-${title.replace(/\s+/g, "-").toLowerCase()}`;
 
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") onCloseRef.current();
       if (e.key === "Tab" && panelRef.current) {
         const focusables = panelRef.current.querySelectorAll<HTMLElement>(
           'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
@@ -57,17 +59,33 @@ export function Modal({
     document.addEventListener("keydown", onKey);
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+
+    // Set initial focus once when modal opens; NEVER steal focus if user is already typing in an input
     const t = window.setTimeout(() => {
-      panelRef.current
-        ?.querySelector<HTMLElement>("input, select, textarea, button")
-        ?.focus();
+      if (!panelRef.current) return;
+      if (
+        panelRef.current.contains(document.activeElement) &&
+        document.activeElement !== panelRef.current
+      ) {
+        return;
+      }
+      // Target input fields inside the modal body first instead of header close button
+      const target =
+        panelRef.current.querySelector<HTMLElement>(
+          'input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled])'
+        ) ||
+        panelRef.current.querySelector<HTMLElement>(
+          'button:not([disabled]):not([aria-label^="Close"])'
+        );
+      target?.focus();
     }, 60);
+
     return () => {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prevOverflow;
       window.clearTimeout(t);
     };
-  }, [open, onClose]);
+  }, [open]);
 
   return (
     <AnimatePresence>

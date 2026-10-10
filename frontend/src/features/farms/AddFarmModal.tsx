@@ -48,6 +48,7 @@ type FormValues = z.infer<typeof schema>;
 export function AddFarmModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { addFarm, settings } = useStore();
   const [submitting, setSubmitting] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
   const [unit, setUnit] = useState<FormValues["areaUnit"]>(settings.areaUnit);
 
   const {
@@ -72,6 +73,7 @@ export function AddFarmModal({ open, onClose }: { open: boolean; onClose: () => 
 
   const onSubmit = async (values: FormValues) => {
     setSubmitting(true);
+    setServerError(null);
     try {
       await addFarm({
         name: values.name,
@@ -85,6 +87,10 @@ export function AddFarmModal({ open, onClose }: { open: boolean; onClose: () => 
       });
       reset();
       onClose();
+    } catch (err: unknown) {
+      setServerError(
+        err instanceof Error ? err.message : "Unable to save farm to server"
+      );
     } finally {
       setSubmitting(false);
     }
@@ -93,9 +99,12 @@ export function AddFarmModal({ open, onClose }: { open: boolean; onClose: () => 
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={() => {
+        setServerError(null);
+        onClose();
+      }}
       title="Add a farm"
-      description="Farms hold the fields and crops HarvestWindow estimates against. Saved locally for this demo — not cloud-synced."
+      description="Farms hold the fields and crops HarvestWindow estimates against."
       size="md"
       footer={
         <>
@@ -114,6 +123,14 @@ export function AddFarmModal({ open, onClose }: { open: boolean; onClose: () => 
         className="flex flex-col gap-4"
         noValidate
       >
+        {serverError && (
+          <div
+            role="alert"
+            className="rounded-md border border-danger/35 bg-[#fdf1ee] px-3.5 py-2.5 text-[12.5px] leading-relaxed text-[#8d3a26]"
+          >
+            {serverError}
+          </div>
+        )}
         <TextField
           label="Farm name"
           required

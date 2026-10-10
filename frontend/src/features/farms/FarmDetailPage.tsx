@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -6,15 +6,19 @@ import {
   Compass,
   Layers,
   MapPin,
+  Pencil,
   Plus,
   Sprout,
+  Trash2,
   TriangleAlert,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button, Card, CardHeader, EmptyState } from "@/components/common/ui";
+import { Modal } from "@/components/common/Modal";
 import { MetricPanel } from "@/features/common/MetricPanel";
 import { CropCard } from "@/features/crops/CropCard";
 import { AddCropModal } from "@/features/crops/AddCropModal";
+import { EditFarmModal } from "@/features/farms/EditFarmModal";
 import { WeatherChart } from "@/components/charts/WeatherChart";
 import { useStore } from "@/store/AppStore";
 import { CONDITION_LABEL, weatherService } from "@/services/weather/weatherService";
@@ -23,14 +27,64 @@ import { formatDate, relativeTime } from "@/utils/date";
 export default function FarmDetailPage() {
   const { farmId } = useParams<{ farmId: string }>();
   const navigate = useNavigate();
-  const { farms, crops, forecasts, weather, selectedFarmId, selectFarm } = useStore();
+  const {
+    farms,
+    crops,
+    forecasts,
+    weather,
+    selectedFarmId,
+    selectFarm,
+    fetchFarm,
+    deleteFarm,
+  } = useStore();
+
   const [addOpen, setAddOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const farm = farms.find((f) => f.id === farmId) ?? null;
+
+  // If not found in store on direct load/refresh, fetch from backend API
+  useEffect(() => {
+    if (!farm && farmId) {
+      setLoading(true);
+      fetchFarm(farmId).finally(() => setLoading(false));
+    }
+  }, [farm, farmId, fetchFarm]);
+
   const farmCrops = useMemo(
     () => (farm ? crops.filter((c) => c.farmId === farm.id) : []),
     [crops, farm]
   );
+
+  const handleDeleteConfirm = async () => {
+    if (!farm) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteFarm(farm.id);
+      setDeleteOpen(false);
+      navigate("/app/farms", { replace: true });
+    } catch (err: unknown) {
+      setDeleteError(
+        err instanceof Error ? err.message : "Unable to delete farm from server"
+      );
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-4">
+        <PageHeader eyebrow="Farm detail" title="Loading farm..." />
+        <div className="h-40 rounded-md border border-line bg-white/50 animate-pulse" />
+      </div>
+    );
+  }
 
   if (!farm) {
     return (
@@ -39,7 +93,7 @@ export default function FarmDetailPage() {
         <EmptyState
           icon={<MapPin className="h-5 w-5" aria-hidden />}
           title="This farm is not in the workspace"
-          description="It may have been removed, or the link points at an older demo record."
+          description="It may have been removed, or the link points at an older record."
           action={
             <Button size="sm" onClick={() => navigate("/app/farms")}>
               Back to farms
@@ -58,9 +112,10 @@ export default function FarmDetailPage() {
     const s = forecasts[c.id]?.readinessStatus;
     return s === "caution" || s === "passed";
   }).length;
-  const trackedArea = Math.round(
-    farmCrops.reduce((sum, c) => sum + (c.fieldArea ?? 0), 0) * 10
-  ) / 10;
+  const trackedArea =
+    Math.round(
+      farmCrops.reduce((sum, c) => sum + (c.fieldArea ?? 0), 0) * 10
+    ) / 10;
 
   return (
     <div className="flex flex-col gap-6">
@@ -90,7 +145,11 @@ export default function FarmDetailPage() {
                 ? `${farm.latitude.toFixed(3)}, ${farm.longitude.toFixed(3)}`
                 : "Not recorded",
           },
-          { icon: <Layers className="h-3.5 w-3.5" aria-hidden />, label: "Area", value: `${farm.area} ${farm.areaUnit === "hectare" ? "ha" : "ac"}` },
+          {
+            icon: <Layers className="h-3.5 w-3.5" aria-hidden />,
+            label: "Area",
+            value: `${farm.area} ${farm.areaUnit === "hectare" ? "ha" : "ac"}`,
+          },
           { label: "Added", value: formatDate(farm.createdAt) },
         ]}
         actions={
@@ -102,6 +161,25 @@ export default function FarmDetailPage() {
               aria-pressed={selectedFarmId === farm.id}
             >
               {selectedFarmId === farm.id ? "Focused in workspace" : "Focus in workspace"}
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setEditOpen(true)}
+              aria-label="Edit farm details"
+            >
+              <Pencil className="h-3.5 w-3.5" aria-hidden />
+              Edit
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setDeleteOpen(true)}
+              className="text-danger hover:bg-danger/10 hover:text-danger"
+              aria-label="Delete farm"
+            >
+              <Trash2 className="h-3.5 w-3.5" aria-hidden />
+              Delete
             </Button>
             <Button size="sm" onClick={() => setAddOpen(true)}>
               <Plus className="h-4 w-4" aria-hidden />
@@ -224,6 +302,68 @@ export default function FarmDetailPage() {
         defaultFarmId={farm.id}
         onCreated={(cropId) => navigate(`/app/crops/${cropId}`)}
       />
+
+      <EditFarmModal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        farm={farm}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        open={deleteOpen}
+        onClose={() => {
+          if (!deleting) {
+            setDeleteError(null);
+            setDeleteOpen(false);
+          }
+        }}
+        title={`Delete ${farm.name}?`}
+        description="This action removes the farm record from your workspace."
+        size="sm"
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setDeleteOpen(false)}
+              disabled={deleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleDeleteConfirm}
+              loading={deleting}
+              className="bg-danger text-white hover:bg-danger/90"
+            >
+              Delete farm
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-3 py-1">
+          {farmCrops.length > 0 && (
+            <div className="rounded-md border border-caution/40 bg-[#fdfaf2] p-3 text-[12.5px] text-[#70520a]">
+              <strong>Warning:</strong> This farm currently has{" "}
+              {farmCrops.length} crop block(s) associated with it. Deleting the
+              farm will detach or remove these blocks.
+            </div>
+          )}
+          {deleteError && (
+            <div
+              role="alert"
+              className="rounded-md border border-danger/35 bg-[#fdf1ee] p-3 text-[12.5px] text-[#8d3a26]"
+            >
+              {deleteError}
+            </div>
+          )}
+          <p className="text-[13px] leading-relaxed text-muted">
+            Are you sure you want to permanently remove <strong>{farm.name}</strong> ({farm.district}, {farm.state})?
+          </p>
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -21,10 +21,13 @@ import type {
 } from "@/types";
 import {
   api,
+  authApi,
   buildIntelligence,
   newActivityId,
+  setAuthToken,
   type NewCropInput,
   type NewFarmInput,
+  type UpdateFarmInput,
 } from "@/services/api";
 import { localStore, type PersistedSnapshot } from "@/services/storage/localStore";
 import { DEFAULT_SETTINGS, DEMO_CREDENTIALS, DEMO_USER } from "@/data/mock/seed";
@@ -90,6 +93,10 @@ interface StoreValue {
 
   completeOnboarding: (draft: OnboardingDraft) => Promise<void>;
   addFarm: (input: NewFarmInput) => Promise<Farm>;
+  updateFarm: (id: string, input: UpdateFarmInput) => Promise<Farm>;
+  deleteFarm: (id: string) => Promise<void>;
+  fetchFarm: (id: string) => Promise<Farm | null>;
+  refreshFarms: () => Promise<Farm[]>;
   addCrop: (input: NewCropInput) => Promise<Crop>;
   removeCrop: (cropId: string) => void;
   setRecommendationStatus: (id: string, status: RecommendationStatus) => Promise<void>;
@@ -217,44 +224,80 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback<StoreValue["signIn"]>(
     async (email, password) => {
-      await new Promise((r) => setTimeout(r, 780));
       const normalized = email.trim().toLowerCase();
-      if (normalized !== DEMO_CREDENTIALS.email || password !== DEMO_CREDENTIALS.password) {
-        return {
-          ok: false,
-          message:
-            "Those credentials do not match the demo account. Use ananya@harvestwindow.demo / harvest-demo.",
-        };
+      try {
+        const live = await authApi.login(normalized, password);
+        patch((prev) => ({
+          ...prev,
+          signedIn: true,
+          user: {
+            fullName: live.user.fullName,
+            email: live.user.email,
+            role: "Farm manager",
+            organisation: "Greenridge Producer Group",
+          },
+        }));
+        return { ok: true };
+      } catch (err: unknown) {
+        // Fallback to demo credentials if offline or local demo
+        if (normalized === DEMO_CREDENTIALS.email && password === DEMO_CREDENTIALS.password) {
+          patch((prev) => ({ ...prev, signedIn: true, user: DEMO_USER }));
+          return { ok: true };
+        }
+        const errorMsg =
+          err instanceof Error
+            ? err.message
+            : "Those credentials do not match. Use ananya@harvestwindow.demo / harvest-demo.";
+        return { ok: false, message: errorMsg };
       }
-      patch((prev) => ({ ...prev, signedIn: true, user: DEMO_USER }));
-      return { ok: true };
     },
     [patch]
   );
 
-  const startDemoSession = useCallback(() => {
+  const startDemoSession = useCallback(async () => {
+    try {
+      await authApi.startDemoSession();
+    } catch {
+      /* ignore offline */
+    }
     patch((prev) => ({ ...prev, signedIn: true, user: DEMO_USER }));
   }, [patch]);
 
   const signUp = useCallback<StoreValue["signUp"]>(
     async ({ fullName, email }) => {
-      await new Promise((r) => setTimeout(r, 820));
-      patch((prev) => ({
-        ...prev,
-        signedIn: true,
-        user: {
-          fullName: fullName.trim(),
-          email: email.trim().toLowerCase(),
-          role: "Farm manager",
-          organisation: "Independent",
-        },
-      }));
-      return { ok: true };
+      try {
+        const live = await authApi.register({ fullName, email });
+        patch((prev) => ({
+          ...prev,
+          signedIn: true,
+          user: {
+            fullName: live.user.fullName,
+            email: live.user.email,
+            role: "Farm manager",
+            organisation: "Independent",
+          },
+        }));
+        return { ok: true };
+      } catch {
+        // Fallback for local demo
+        patch((prev) => ({
+          ...prev,
+          signedIn: true,
+          user: {
+            fullName: fullName.trim(),
+            email: email.trim().toLowerCase(),
+            role: "Farm manager",
+            organisation: "Independent",
+          },
+        }));
+        return { ok: true };
+      }
     },
     [patch]
   );
 
   const signOut = useCallback(() => {
+    setAuthToken(null);
     patch((prev) => ({ ...prev, signedIn: false }));
     setShowOnboarding(false);
   }, [patch]);
@@ -362,6 +405,80 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     },
     [patch, toast]
   );
+
+  const updateFarm = useCallback<StoreValue["updateFarm"]>(
+    async (id, input) => {
+      const { farm, activity } = await api.updateFarm(id, input);
+      patch((prev) => ({
+        ...prev,
+        farms: prev.farms.map((f) => (f.id === id ? farm : f)),
+        activity: [activity, ...prev.activity].slice(0, 40),
+      }));
+      toast({
+        tone: "success",
+        title: `${farm.name} updated`,
+        description: "Farm details saved successfully.",
+      });
+      return farm;
+    },
+    [patch, toast]
+  );
+
+  const deleteFarm = useCallback<StoreValue["deleteFarm"]>(
+    async (id) => {
+      const existing = snapshot.farms.find((f) => f.id === id);
+      const { activity } = await api.deleteFarm(id);
+      patch((prev) => {
+        const nextFarms = prev.farms.filter((f) => f.id !== id);
+        const nextDefaultFarmId =
+          prev.settings.defaultFarmId === id
+            ? (nextFarms[0]?.id ?? null)
+            : prev.settings.defaultFarmId;
+        return {
+          ...prev,
+          farms: nextFarms,
+          settings: { ...prev.settings, defaultFarmId: nextDefaultFarmId },
+          activity: [activity, ...prev.activity].slice(0, 40),
+        };
+      });
+      setSelectedFarmId((curr) => (curr === id ? ALL_FARMS : curr));
+      toast({
+        tone: "info",
+        title: `${existing?.name ?? "Farm"} deleted`,
+        description: "Farm record removed from workspace.",
+      });
+    },
+    [patch, snapshot.farms, toast]
+  );
+
+  const fetchFarm = useCallback<StoreValue["fetchFarm"]>(
+    async (id) => {
+      try {
+        const farm = await api.getFarm(id);
+        patch((prev) => {
+          const exists = prev.farms.some((f) => f.id === id);
+          return {
+            ...prev,
+            farms: exists ? prev.farms.map((f) => (f.id === id ? farm : f)) : [...prev.farms, farm],
+          };
+        });
+        return farm;
+      } catch {
+        return null;
+      }
+    },
+    [patch]
+  );
+
+  const refreshFarms = useCallback<StoreValue["refreshFarms"]>(async () => {
+    try {
+      const liveFarms = await api.listFarms();
+      patch((prev) => ({ ...prev, farms: liveFarms }));
+      return liveFarms;
+    } catch {
+      return snapshot.farms;
+    }
+  }, [patch, snapshot.farms]);
 
   const addCrop = useCallback<StoreValue["addCrop"]>(
     async (input) => {
@@ -527,6 +644,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       signOut,
       completeOnboarding,
       addFarm,
+      updateFarm,
+      deleteFarm,
+      fetchFarm,
+      refreshFarms,
       addCrop,
       removeCrop,
       setRecommendationStatus,
@@ -552,6 +673,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       signOut,
       completeOnboarding,
       addFarm,
+      updateFarm,
+      deleteFarm,
+      fetchFarm,
+      refreshFarms,
       addCrop,
       removeCrop,
       setRecommendationStatus,

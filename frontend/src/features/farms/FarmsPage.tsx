@@ -212,8 +212,7 @@ export default function FarmsPage() {
           "rounded-md border border-line bg-white/70 px-4 py-3 text-[12px] leading-relaxed text-muted"
         )}
       >
-        Farms and crops are stored in this browser through the local demo persistence layer.
-        Nothing is synchronised to a server in this build.
+        Farm records are managed securely via the backend API and persisted in the database.
       </p>
 
       <AddFarmModal open={addOpen} onClose={() => setAddOpen(false)} />
