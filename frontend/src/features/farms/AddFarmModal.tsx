@@ -14,6 +14,26 @@ import {
 import { INDIAN_STATES } from "@/data/mock/cropCatalog";
 import { useStore } from "@/store/AppStore";
 
+export const SOIL_TYPE_OPTIONS = [
+  { value: "Alluvial", label: "Alluvial Soil (River plains / high fertility)" },
+  { value: "Black (Regur)", label: "Black Soil / Regur (Cotton & heavy soils)" },
+  { value: "Red & Yellow", label: "Red & Yellow Soil (Deciduous & drylands)" },
+  { value: "Laterite", label: "Laterite Soil (High rainfall / acidic)" },
+  { value: "Sandy / Arid", label: "Sandy / Arid Soil (Dry zones)" },
+  { value: "Clayey Loam", label: "Clay Loam (High water retention)" },
+  { value: "Peaty / Organic", label: "Peaty / Organic Soil (Marshy/wetlands)" },
+];
+
+export const IRRIGATION_SOURCE_OPTIONS = [
+  { value: "Canal", label: "Canal Irrigation (Public grid / river canal)" },
+  { value: "Borewell / Tube-well", label: "Borewell / Tube-well (Groundwater)" },
+  { value: "Drip Irrigation", label: "Drip Irrigation (Precision micro-irrigation)" },
+  { value: "Sprinkler", label: "Sprinkler Irrigation (Overhead spray)" },
+  { value: "Rainfed / Monsoon", label: "Rainfed (Monsoon dependent)" },
+  { value: "Open Well / Farm Pond", label: "Open Well / Farm Pond" },
+  { value: "Mixed", label: "Mixed / Multiple sources" },
+];
+
 const coord = (min: number, max: number, name: string) =>
   z
     .string()
@@ -24,9 +44,13 @@ const coord = (min: number, max: number, name: string) =>
     });
 
 const schema = z.object({
-  name: z.string().trim().min(2, "Give the farm a recognisable name").max(60),
+  name: z.string().trim().min(2, "Give the farm a recognisable name").max(100),
   state: z.string().min(2, "Select the state"),
-  district: z.string().trim().min(2, "Enter the district or locality").max(60),
+  district: z.string().trim().min(2, "Enter the district or locality").max(100),
+  village: z.string().trim().max(100).optional(),
+  pincode: z.string().trim().max(10).optional(),
+  soilType: z.string().optional(),
+  irrigationSource: z.string().optional(),
   latitude: coord(-90, 90, "Latitude"),
   longitude: coord(-180, 180, "Longitude"),
   area: z
@@ -40,7 +64,7 @@ const schema = z.object({
       message: "That looks larger than a real holding",
     }),
   areaUnit: z.enum(["hectare", "acre"]),
-  notes: z.string().trim().max(240, "Keep notes under 240 characters").optional(),
+  notes: z.string().trim().max(300, "Keep notes under 300 characters").optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -63,6 +87,10 @@ export function AddFarmModal({ open, onClose }: { open: boolean; onClose: () => 
       name: "",
       state: "",
       district: "",
+      village: "",
+      pincode: "",
+      soilType: "",
+      irrigationSource: "",
       latitude: "",
       longitude: "",
       area: "",
@@ -79,6 +107,10 @@ export function AddFarmModal({ open, onClose }: { open: boolean; onClose: () => 
         name: values.name,
         state: values.state,
         district: values.district,
+        village: values.village || undefined,
+        pincode: values.pincode || undefined,
+        soilType: values.soilType || undefined,
+        irrigationSource: values.irrigationSource || undefined,
         latitude: values.latitude ? Number(values.latitude) : null,
         longitude: values.longitude ? Number(values.longitude) : null,
         area: Number(values.area),
@@ -104,7 +136,7 @@ export function AddFarmModal({ open, onClose }: { open: boolean; onClose: () => 
         onClose();
       }}
       title="Add a farm"
-      description="Farms hold the fields and crops HarvestWindow estimates against."
+      description="Farms hold the fields, soil context, and crop records HarvestWindow estimates against."
       size="md"
       footer={
         <>
@@ -134,7 +166,7 @@ export function AddFarmModal({ open, onClose }: { open: boolean; onClose: () => 
         <TextField
           label="Farm name"
           required
-          placeholder="e.g. Greenridge Farm"
+          placeholder="e.g. Greenridge Valley Holding"
           error={errors.name?.message}
           leadingIcon={<MapPin className="h-4 w-4" aria-hidden />}
           {...register("name")}
@@ -160,19 +192,37 @@ export function AddFarmModal({ open, onClose }: { open: boolean; onClose: () => 
 
         <div className="grid gap-4 sm:grid-cols-2">
           <TextField
-            label="Latitude (optional)"
-            placeholder="13.0068"
-            inputMode="decimal"
-            hint="Coordinates let a real weather provider be connected later."
-            error={errors.latitude?.message}
-            {...register("latitude")}
+            label="Village / Taluka (optional)"
+            placeholder="e.g. Holenarasipura Taluk"
+            hint="Specific sub-district or panchayat locality."
+            error={errors.village?.message}
+            {...register("village")}
           />
           <TextField
-            label="Longitude (optional)"
-            placeholder="76.1001"
-            inputMode="decimal"
-            error={errors.longitude?.message}
-            {...register("longitude")}
+            label="PIN / Postal Code (optional)"
+            placeholder="e.g. 573211"
+            maxLength={10}
+            error={errors.pincode?.message}
+            {...register("pincode")}
+          />
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <SelectField
+            label="Soil type (optional)"
+            placeholder="Select soil classification"
+            options={SOIL_TYPE_OPTIONS}
+            error={errors.soilType?.message}
+            hint="Influences soil moisture capacity and crop duration."
+            {...register("soilType")}
+          />
+          <SelectField
+            label="Primary irrigation source (optional)"
+            placeholder="Select irrigation method"
+            options={IRRIGATION_SOURCE_OPTIONS}
+            error={errors.irrigationSource?.message}
+            hint="Helps calculate drought and readiness factors."
+            {...register("irrigationSource")}
           />
         </div>
 
@@ -207,10 +257,28 @@ export function AddFarmModal({ open, onClose }: { open: boolean; onClose: () => 
           </div>
         </div>
 
+        <div className="grid gap-4 sm:grid-cols-2">
+          <TextField
+            label="Latitude (optional)"
+            placeholder="13.0068"
+            inputMode="decimal"
+            hint="Allows live weather grid lookup."
+            error={errors.latitude?.message}
+            {...register("latitude")}
+          />
+          <TextField
+            label="Longitude (optional)"
+            placeholder="76.1001"
+            inputMode="decimal"
+            error={errors.longitude?.message}
+            {...register("longitude")}
+          />
+        </div>
+
         <TextAreaField
           label="Notes (optional)"
-          placeholder="Irrigation source, soil type, boundary details…"
-          hint="Up to 240 characters."
+          placeholder="Access roads, water channel maintenance, boundary notes…"
+          hint="Up to 300 characters."
           error={errors.notes?.message}
           {...register("notes")}
         />

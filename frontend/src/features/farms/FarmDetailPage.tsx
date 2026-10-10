@@ -135,7 +135,17 @@ export default function FarmDetailPage() {
           {
             icon: <MapPin className="h-3.5 w-3.5" aria-hidden />,
             label: "Location",
-            value: `${farm.district}, ${farm.state}`,
+            value: farm.village
+              ? `${farm.village}, ${farm.district}, ${farm.state}${farm.pincode ? ` (${farm.pincode})` : ""}`
+              : `${farm.district}, ${farm.state}`,
+          },
+          {
+            icon: <Sprout className="h-3.5 w-3.5" aria-hidden />,
+            label: "Soil & Water",
+            value:
+              farm.soilType || farm.irrigationSource
+                ? `${farm.soilType || "Standard soil"} · ${farm.irrigationSource || "Mixed water"}`
+                : "Not specified",
           },
           {
             icon: <Compass className="h-3.5 w-3.5" aria-hidden />,

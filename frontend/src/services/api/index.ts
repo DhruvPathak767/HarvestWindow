@@ -15,6 +15,8 @@ import {
 import { weatherService } from "@/services/weather/weatherService";
 import { computeForecasts } from "@/services/forecast/forecastService";
 
+import { authClient } from "@/services/api/authClient";
+
 /**
  * Runtime configuration for API communication.
  * Default baseUrl points to the backend /api endpoint.
@@ -22,7 +24,9 @@ import { computeForecasts } from "@/services/forecast/forecastService";
  */
 export const API_CONFIG = {
   baseUrl:
-    (import.meta.env?.VITE_API_URL as string) || "http://localhost:5000/api",
+    (import.meta.env?.VITE_API_BASE_URL as string) ||
+    (import.meta.env?.VITE_API_URL as string) ||
+    "http://localhost:5000/api",
   mode: ((import.meta.env?.VITE_API_MODE as string) || "live") as "demo" | "live",
   latencyMs: 380,
 };
@@ -31,6 +35,8 @@ const TOKEN_STORAGE_KEY = "harvestwindow.auth.token";
 
 export function getAuthToken(): string | null {
   try {
+    const memory = authClient.getAccessToken();
+    if (memory) return memory;
     return window.localStorage.getItem(TOKEN_STORAGE_KEY);
   } catch {
     return null;
@@ -109,6 +115,10 @@ export interface NewFarmInput {
   name: string;
   state: string;
   district: string;
+  soilType?: string | null;
+  irrigationSource?: string | null;
+  village?: string | null;
+  pincode?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   area: number;
@@ -120,6 +130,10 @@ export interface UpdateFarmInput {
   name?: string;
   state?: string;
   district?: string;
+  soilType?: string | null;
+  irrigationSource?: string | null;
+  village?: string | null;
+  pincode?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   area?: number;
@@ -170,10 +184,13 @@ export const api: HarvestWindowApi = {
     if (API_CONFIG.mode === "live") {
       try {
         const liveFarms = await this.listFarms();
-        return {
-          ...baseSnapshot,
-          farms: liveFarms,
-        };
+        if (Array.isArray(liveFarms) && liveFarms.length > 0) {
+          return {
+            ...baseSnapshot,
+            farms: liveFarms,
+          };
+        }
+        return baseSnapshot;
       } catch (err) {
         console.warn(
           "[HarvestWindow API] Unable to fetch live farms during snapshot load, using cached demo data:",
@@ -189,8 +206,12 @@ export const api: HarvestWindowApi = {
 
   async listFarms() {
     if (API_CONFIG.mode === "live") {
-      const res = await apiRequest<{ success: boolean; data: Farm[] }>("/farms");
-      return res.data;
+      try {
+        const res = await apiRequest<{ success: boolean; data: Farm[] }>("/farms");
+        return res.data;
+      } catch (err) {
+        console.warn("[HarvestWindow API] listFarms live request failed, using local store:", err);
+      }
     }
     const snap = localStore.load() ?? buildSeedSnapshot();
     return snap.farms;
@@ -198,8 +219,12 @@ export const api: HarvestWindowApi = {
 
   async getFarm(id: string) {
     if (API_CONFIG.mode === "live") {
-      const res = await apiRequest<{ success: boolean; data: Farm }>(`/farms/${id}`);
-      return res.data;
+      try {
+        const res = await apiRequest<{ success: boolean; data: Farm }>(`/farms/${id}`);
+        return res.data;
+      } catch (err) {
+        console.warn(`[HarvestWindow API] getFarm live request failed for ${id}, using local store:`, err);
+      }
     }
     const snap = localStore.load() ?? buildSeedSnapshot();
     const farm = snap.farms.find((f) => f.id === id);
@@ -209,29 +234,43 @@ export const api: HarvestWindowApi = {
 
   async createFarm(input) {
     if (API_CONFIG.mode === "live") {
-      const res = await apiRequest<{ success: boolean; data: Farm }>("/farms", {
-        method: "POST",
-        body: JSON.stringify(input),
-      });
-      const farm = res.data;
-      return {
-        farm,
-        activity: {
-          id: nextId("act"),
-          type: "farm-added",
-          message: `${farm.name} added (${farm.district}, ${farm.state})`,
-          at: new Date().toISOString(),
-          farmId: farm.id,
-        },
-      };
+      try {
+        const res = await apiRequest<{ success: boolean; data: Farm }>("/farms", {
+          method: "POST",
+          body: JSON.stringify(input),
+        });
+        const farm = res.data;
+        const snap = localStore.load() ?? buildSeedSnapshot();
+        if (!snap.farms.some((f) => f.id === farm.id)) {
+          snap.farms.push(farm);
+          localStore.save(snap);
+        }
+        return {
+          farm,
+          activity: {
+            id: nextId("act"),
+            type: "farm-added",
+            message: `${farm.name} added (${farm.district}, ${farm.state})`,
+            at: new Date().toISOString(),
+            farmId: farm.id,
+          },
+        };
+      } catch (err) {
+        console.warn("[HarvestWindow API] Live farm creation failed, falling back to local store:", err);
+      }
     }
 
     await wait();
+    const snap = localStore.load() ?? buildSeedSnapshot();
     const farm: Farm = {
       id: nextId("farm"),
       name: input.name.trim(),
       state: input.state,
       district: input.district.trim(),
+      soilType: input.soilType || null,
+      irrigationSource: input.irrigationSource || null,
+      village: input.village || null,
+      pincode: input.pincode || null,
       latitude: input.latitude ?? null,
       longitude: input.longitude ?? null,
       area: input.area,
@@ -239,6 +278,9 @@ export const api: HarvestWindowApi = {
       notes: input.notes?.trim() || undefined,
       createdAt: new Date().toISOString(),
     };
+    snap.farms.push(farm);
+    localStore.save(snap);
+
     return {
       farm,
       activity: {
@@ -253,45 +295,59 @@ export const api: HarvestWindowApi = {
 
   async updateFarm(id, input) {
     if (API_CONFIG.mode === "live") {
-      const res = await apiRequest<{ success: boolean; data: Farm }>(`/farms/${id}`, {
-        method: "PUT",
-        body: JSON.stringify(input),
-      });
-      const farm = res.data;
-      return {
-        farm,
-        activity: {
-          id: nextId("act"),
-          type: "farm-added",
-          message: `${farm.name} updated`,
-          at: new Date().toISOString(),
-          farmId: farm.id,
-        },
-      };
+      try {
+        const res = await apiRequest<{ success: boolean; data: Farm }>(`/farms/${id}`, {
+          method: "PUT",
+          body: JSON.stringify(input),
+        });
+        const farm = res.data;
+        const snap = localStore.load() ?? buildSeedSnapshot();
+        snap.farms = snap.farms.map((f) => (f.id === id ? farm : f));
+        localStore.save(snap);
+        return {
+          farm,
+          activity: {
+            id: nextId("act"),
+            type: "farm-updated",
+            message: `${farm.name} updated`,
+            at: new Date().toISOString(),
+            farmId: farm.id,
+          },
+        };
+      } catch (err) {
+        console.warn(`[HarvestWindow API] Live farm update failed for ${id}, using local store:`, err);
+      }
     }
 
     await wait();
     const snap = localStore.load() ?? buildSeedSnapshot();
-    const existing = snap.farms.find((f) => f.id === id);
-    if (!existing) throw new Error("Farm not found");
+    const index = snap.farms.findIndex((f) => f.id === id);
+    if (index === -1) throw new Error("Farm not found");
 
+    const existing = snap.farms[index];
     const updated: Farm = {
       ...existing,
-      name: input.name ?? existing.name,
-      state: input.state ?? existing.state,
-      district: input.district ?? existing.district,
+      name: input.name !== undefined ? input.name.trim() : existing.name,
+      state: input.state !== undefined ? input.state : existing.state,
+      district: input.district !== undefined ? input.district.trim() : existing.district,
+      soilType: input.soilType !== undefined ? input.soilType : existing.soilType,
+      irrigationSource: input.irrigationSource !== undefined ? input.irrigationSource : existing.irrigationSource,
+      village: input.village !== undefined ? input.village : existing.village,
+      pincode: input.pincode !== undefined ? input.pincode : existing.pincode,
       latitude: input.latitude !== undefined ? input.latitude : existing.latitude,
       longitude: input.longitude !== undefined ? input.longitude : existing.longitude,
-      area: input.area ?? existing.area,
-      areaUnit: input.areaUnit ?? existing.areaUnit,
-      notes: input.notes !== undefined ? input.notes : existing.notes,
+      area: input.area !== undefined ? input.area : existing.area,
+      areaUnit: input.areaUnit !== undefined ? input.areaUnit : existing.areaUnit,
+      notes: input.notes !== undefined ? input.notes.trim() || undefined : existing.notes,
     };
+    snap.farms[index] = updated;
+    localStore.save(snap);
 
     return {
       farm: updated,
       activity: {
         id: nextId("act"),
-        type: "farm-added",
+        type: "farm-updated",
         message: `${updated.name} updated`,
         at: new Date().toISOString(),
         farmId: updated.id,
@@ -301,22 +357,21 @@ export const api: HarvestWindowApi = {
 
   async deleteFarm(id) {
     if (API_CONFIG.mode === "live") {
-      await apiRequest<{ success: boolean; message: string }>(`/farms/${id}`, {
-        method: "DELETE",
-      });
-      return {
-        id,
-        activity: {
-          id: nextId("act"),
-          type: "farm-added",
-          message: "Farm record removed from workspace",
-          at: new Date().toISOString(),
-          farmId: id,
-        },
-      };
+      try {
+        await apiRequest<{ success: boolean; message: string }>(`/farms/${id}`, {
+          method: "DELETE",
+        });
+      } catch (err) {
+        console.warn(`[HarvestWindow API] Live deleteFarm failed for ${id}, updating local store:`, err);
+      }
     }
 
     await wait();
+    const snap = localStore.load() ?? buildSeedSnapshot();
+    snap.farms = snap.farms.filter((f) => f.id !== id);
+    snap.crops = snap.crops.filter((c) => c.farmId !== id);
+    localStore.save(snap);
+
     return {
       id,
       activity: {

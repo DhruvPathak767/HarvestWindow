@@ -11,6 +11,10 @@ export function formatFarm(farm) {
     name: farm.name,
     state: farm.state,
     district: farm.district,
+    soilType: farm.soilType || null,
+    irrigationSource: farm.irrigationSource || null,
+    village: farm.village || null,
+    pincode: farm.pincode || null,
     latitude:
       farm.latitude !== null && farm.latitude !== undefined
         ? Number(farm.latitude)
@@ -84,7 +88,8 @@ export async function createFarm(userId, input) {
       create: {
         id: userId,
         email: `${userId}@harvestwindow.local`,
-        fullName: "Farm Owner",
+        name: "Farm Owner",
+        passwordHash: "$argon2id$v=19$m=65536,t=3,p=4$demo_salt$demo_hash",
       },
     });
   }
@@ -95,10 +100,14 @@ export async function createFarm(userId, input) {
       name: input.name,
       state: input.state,
       district: input.district,
+      soilType: input.soilType || null,
+      irrigationSource: input.irrigationSource || null,
+      village: input.village || null,
+      pincode: input.pincode || null,
       latitude: input.latitude !== undefined ? input.latitude : null,
       longitude: input.longitude !== undefined ? input.longitude : null,
       area: input.area,
-      areaUnit: input.areaUnit,
+      areaUnit: input.areaUnit || "hectare",
       notes: input.notes || null,
     },
   });
@@ -130,6 +139,10 @@ export async function updateFarm(userId, farmId, input) {
   if (input.name !== undefined) updateData.name = input.name;
   if (input.state !== undefined) updateData.state = input.state;
   if (input.district !== undefined) updateData.district = input.district;
+  if (input.soilType !== undefined) updateData.soilType = input.soilType;
+  if (input.irrigationSource !== undefined) updateData.irrigationSource = input.irrigationSource;
+  if (input.village !== undefined) updateData.village = input.village;
+  if (input.pincode !== undefined) updateData.pincode = input.pincode;
   if (input.latitude !== undefined) updateData.latitude = input.latitude;
   if (input.longitude !== undefined) updateData.longitude = input.longitude;
   if (input.area !== undefined) updateData.area = input.area;

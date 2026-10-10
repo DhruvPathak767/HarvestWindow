@@ -28,6 +28,10 @@ export interface Farm {
   name: string;
   state: string;
   district: string;
+  soilType?: string | null;
+  irrigationSource?: string | null;
+  village?: string | null;
+  pincode?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   area: number;

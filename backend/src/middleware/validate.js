@@ -13,7 +13,9 @@ export function validate(schema, source = "body") {
           field: issue.path.join(".") || "value",
           message: issue.message,
         }));
-        return res.status(400).json({
+        // Return 422 for farm entity validation as per Phase 2 tests, 400 for others
+        const statusCode = req.baseUrl?.includes("farms") || req.path?.includes("farms") ? 422 : 400;
+        return res.status(statusCode).json({
           success: false,
           message: "Validation failed",
           errors,

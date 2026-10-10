@@ -46,7 +46,7 @@ export const createFarmSchema = z
       .string()
       .trim()
       .min(2, "Farm name must be at least 2 characters")
-      .max(100, "Farm name cannot exceed 100 characters"),
+      .max(120, "Farm name cannot exceed 120 characters"),
     state: z
       .string()
       .trim()
@@ -57,6 +57,34 @@ export const createFarmSchema = z
       .trim()
       .min(2, "District must be at least 2 characters")
       .max(100, "District cannot exceed 100 characters"),
+    soilType: z
+      .string()
+      .trim()
+      .max(100)
+      .nullable()
+      .optional()
+      .transform((v) => (v ? v.trim() : null)),
+    irrigationSource: z
+      .string()
+      .trim()
+      .max(100)
+      .nullable()
+      .optional()
+      .transform((v) => (v ? v.trim() : null)),
+    village: z
+      .string()
+      .trim()
+      .max(120)
+      .nullable()
+      .optional()
+      .transform((v) => (v ? v.trim() : null)),
+    pincode: z
+      .string()
+      .trim()
+      .max(20)
+      .nullable()
+      .optional()
+      .transform((v) => (v ? v.trim() : null)),
     latitude: coordSchema(-90, 90, "Latitude"),
     longitude: coordSchema(-180, 180, "Longitude"),
     area: areaSchema,
@@ -93,7 +121,7 @@ export const updateFarmSchema = z
       .string()
       .trim()
       .min(2, "Farm name must be at least 2 characters")
-      .max(100, "Farm name cannot exceed 100 characters")
+      .max(120, "Farm name cannot exceed 120 characters")
       .optional(),
     state: z
       .string()
@@ -107,6 +135,34 @@ export const updateFarmSchema = z
       .min(2, "District must be at least 2 characters")
       .max(100, "District cannot exceed 100 characters")
       .optional(),
+    soilType: z
+      .string()
+      .trim()
+      .max(100)
+      .nullable()
+      .optional()
+      .transform((v) => (v ? v.trim() : null)),
+    irrigationSource: z
+      .string()
+      .trim()
+      .max(100)
+      .nullable()
+      .optional()
+      .transform((v) => (v ? v.trim() : null)),
+    village: z
+      .string()
+      .trim()
+      .max(120)
+      .nullable()
+      .optional()
+      .transform((v) => (v ? v.trim() : null)),
+    pincode: z
+      .string()
+      .trim()
+      .max(20)
+      .nullable()
+      .optional()
+      .transform((v) => (v ? v.trim() : null)),
     latitude: coordSchema(-90, 90, "Latitude"),
     longitude: coordSchema(-180, 180, "Longitude"),
     area: areaSchema.optional(),
@@ -125,7 +181,6 @@ export const updateFarmSchema = z
   })
   .refine(
     (data) => {
-      // If either coordinate is explicitly supplied (and not null), both must be supplied
       const hasLat = data.latitude !== null && data.latitude !== undefined;
       const hasLon = data.longitude !== null && data.longitude !== undefined;
       if (hasLat || hasLon) {

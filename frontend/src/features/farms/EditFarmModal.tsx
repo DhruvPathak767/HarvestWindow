@@ -5,6 +5,7 @@ import { z } from "zod";
 import { Modal } from "@/components/common/Modal";
 import { Button } from "@/components/common/ui";
 import {
+  SegmentedControl,
   SelectField,
   TextAreaField,
   TextField,
@@ -12,6 +13,7 @@ import {
 import { INDIAN_STATES } from "@/data/mock/cropCatalog";
 import { useStore } from "@/store/AppStore";
 import type { Farm } from "@/types";
+import { SOIL_TYPE_OPTIONS, IRRIGATION_SOURCE_OPTIONS } from "./AddFarmModal";
 
 const coord = (min: number, max: number, name: string) =>
   z
@@ -23,9 +25,13 @@ const coord = (min: number, max: number, name: string) =>
     });
 
 const schema = z.object({
-  name: z.string().trim().min(2, "Give the farm a recognisable name").max(60),
+  name: z.string().trim().min(2, "Give the farm a recognisable name").max(100),
   state: z.string().min(2, "Select the state"),
-  district: z.string().trim().min(2, "Enter the district or locality").max(60),
+  district: z.string().trim().min(2, "Enter the district or locality").max(100),
+  village: z.string().trim().max(100).optional(),
+  pincode: z.string().trim().max(10).optional(),
+  soilType: z.string().optional(),
+  irrigationSource: z.string().optional(),
   latitude: coord(-90, 90, "Latitude"),
   longitude: coord(-180, 180, "Longitude"),
   area: z
@@ -39,7 +45,7 @@ const schema = z.object({
       message: "That looks larger than a real holding",
     }),
   areaUnit: z.enum(["hectare", "acre"]),
-  notes: z.string().trim().max(240, "Keep notes under 240 characters").optional(),
+  notes: z.string().trim().max(300, "Keep notes under 300 characters").optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -56,10 +62,12 @@ export function EditFarmModal({
   const { updateFarm } = useStore();
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [unit, setUnit] = useState<FormValues["areaUnit"]>(farm.areaUnit || "hectare");
 
   const {
     register,
     handleSubmit,
+    setValue,
     reset,
     formState: { errors },
   } = useForm<FormValues>({
@@ -68,6 +76,10 @@ export function EditFarmModal({
       name: farm.name,
       state: farm.state,
       district: farm.district,
+      village: farm.village || "",
+      pincode: farm.pincode || "",
+      soilType: farm.soilType || "",
+      irrigationSource: farm.irrigationSource || "",
       latitude: farm.latitude ? String(farm.latitude) : "",
       longitude: farm.longitude ? String(farm.longitude) : "",
       area: String(farm.area),
@@ -78,10 +90,15 @@ export function EditFarmModal({
 
   useEffect(() => {
     if (open && farm) {
+      setUnit(farm.areaUnit || "hectare");
       reset({
         name: farm.name,
         state: farm.state,
         district: farm.district,
+        village: farm.village || "",
+        pincode: farm.pincode || "",
+        soilType: farm.soilType || "",
+        irrigationSource: farm.irrigationSource || "",
         latitude: farm.latitude ? String(farm.latitude) : "",
         longitude: farm.longitude ? String(farm.longitude) : "",
         area: String(farm.area),
@@ -100,10 +117,14 @@ export function EditFarmModal({
         name: values.name,
         state: values.state,
         district: values.district,
+        village: values.village || undefined,
+        pincode: values.pincode || undefined,
+        soilType: values.soilType || undefined,
+        irrigationSource: values.irrigationSource || undefined,
         latitude: values.latitude ? Number(values.latitude) : null,
         longitude: values.longitude ? Number(values.longitude) : null,
         area: Number(values.area),
-        areaUnit: values.areaUnit,
+        areaUnit: unit,
         notes: values.notes || undefined,
       });
       onClose();
@@ -124,7 +145,7 @@ export function EditFarmModal({
         onClose();
       }}
       title={`Edit ${farm.name}`}
-      description="Update location, holding area or notes for this farm."
+      description="Update boundaries, soil attributes, and irrigation context."
       size="md"
       footer={
         <>
@@ -151,68 +172,112 @@ export function EditFarmModal({
             {serverError}
           </div>
         )}
-
         <TextField
           label="Farm name"
           required
-          placeholder="e.g. Kaveri Belt Collective"
+          placeholder="e.g. Greenridge Valley Holding"
           error={errors.name?.message}
           {...register("name")}
         />
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2">
           <SelectField
             label="State"
             required
-            options={INDIAN_STATES.map((s) => ({ value: s, label: s }))}
+            placeholder="Select state"
             error={errors.state?.message}
+            options={INDIAN_STATES.map((s) => ({ value: s, label: s }))}
             {...register("state")}
           />
           <TextField
-            label="District / locality"
+            label="District or locality"
             required
-            placeholder="e.g. Thanjavur"
+            placeholder="e.g. Hassan"
             error={errors.district?.message}
             {...register("district")}
           />
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2">
           <TextField
-            label="Total holding area"
-            required
-            type="number"
-            step="any"
-            placeholder="e.g. 16"
-            error={errors.area?.message}
-            {...register("area")}
+            label="Village / Taluka (optional)"
+            placeholder="e.g. Holenarasipura Taluk"
+            hint="Specific sub-district or village locality."
+            error={errors.village?.message}
+            {...register("village")}
           />
-          <SelectField
-            label="Unit"
-            required
-            options={[
-              { value: "hectare", label: "Hectares (ha)" },
-              { value: "acre", label: "Acres (ac)" },
-            ]}
-            error={errors.areaUnit?.message}
-            {...register("areaUnit")}
+          <TextField
+            label="PIN / Postal Code (optional)"
+            placeholder="e.g. 573211"
+            maxLength={10}
+            error={errors.pincode?.message}
+            {...register("pincode")}
           />
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <SelectField
+            label="Soil type (optional)"
+            placeholder="Select soil classification"
+            options={SOIL_TYPE_OPTIONS}
+            error={errors.soilType?.message}
+            hint="Influences soil moisture capacity and crop duration."
+            {...register("soilType")}
+          />
+          <SelectField
+            label="Primary irrigation source (optional)"
+            placeholder="Select irrigation method"
+            options={IRRIGATION_SOURCE_OPTIONS}
+            error={errors.irrigationSource?.message}
+            hint="Helps calculate drought and readiness factors."
+            {...register("irrigationSource")}
+          />
+        </div>
+
+        <div className="grid items-end gap-4 sm:grid-cols-[1fr_auto]">
+          <TextField
+            label="Field size"
+            required
+            placeholder="e.g. 12.5"
+            inputMode="decimal"
+            error={errors.area?.message}
+            {...register("area")}
+          />
+          <div className="flex flex-col gap-1.5">
+            <span
+              className="font-display text-[12.5px] font-semibold text-forest-deep"
+              id="area-unit-label"
+            >
+              Unit
+            </span>
+            <SegmentedControl
+              ariaLabel="Area unit"
+              value={unit}
+              onChange={(v) => {
+                setUnit(v);
+                setValue("areaUnit", v);
+              }}
+              options={[
+                { value: "hectare", label: "Hectares" },
+                { value: "acre", label: "Acres" },
+              ]}
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
           <TextField
             label="Latitude (optional)"
-            type="number"
-            step="any"
-            placeholder="e.g. 10.787"
+            placeholder="13.0068"
+            inputMode="decimal"
+            hint="Coordinates let a real weather provider be connected later."
             error={errors.latitude?.message}
             {...register("latitude")}
           />
           <TextField
             label="Longitude (optional)"
-            type="number"
-            step="any"
-            placeholder="e.g. 79.138"
+            placeholder="76.1001"
+            inputMode="decimal"
             error={errors.longitude?.message}
             {...register("longitude")}
           />
@@ -220,8 +285,8 @@ export function EditFarmModal({
 
         <TextAreaField
           label="Notes (optional)"
-          placeholder="Irrigation sources, soil notes, access details…"
-          rows={3}
+          placeholder="Access roads, water channel maintenance, boundary notes…"
+          hint="Up to 300 characters."
           error={errors.notes?.message}
           {...register("notes")}
         />
