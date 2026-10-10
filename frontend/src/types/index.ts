@@ -364,3 +364,131 @@ export const READINESS_META: Record<
     tone: "earth",
   },
 };
+
+export interface AgriCrop {
+  id: string;
+  canonicalName: string;
+  scientificName?: string | null;
+  category: string;
+  description?: string | null;
+  isActive: boolean;
+  varieties?: AgriVariety[];
+  growthProfiles?: AgriGrowthProfile[];
+  suitabilityProfiles?: AgriSuitabilityProfile[];
+  cropCalendars?: AgriCropCalendar[];
+}
+
+export interface AgriVariety {
+  id: string;
+  cropId: string;
+  varietyName: string;
+  officialIdentifier?: string | null;
+  regionSuitability?: string | null;
+  typicalDurationDays?: number | null;
+  verificationStatus: string;
+}
+
+export interface AgriSeason {
+  id: string;
+  canonicalName: string;
+  localNames?: string | null;
+  description?: string | null;
+  startMonth?: number | null;
+  endMonth?: number | null;
+  geographicScope?: string | null;
+  verificationStatus: string;
+}
+
+export interface AgriRegion {
+  id: string;
+  country: string;
+  state: string;
+  district: string;
+  verificationStatus: string;
+}
+
+export interface AgriCropCalendar {
+  id: string;
+  cropId: string;
+  crop?: { id: string; canonicalName: string };
+  varietyId?: string | null;
+  variety?: { id: string; varietyName: string } | null;
+  regionId: string;
+  region?: { id: string; state: string; district: string };
+  seasonId: string;
+  season?: { id: string; canonicalName: string };
+  sowingStartMonth: number;
+  sowingStartDay?: number | null;
+  sowingEndMonth: number;
+  sowingEndDay?: number | null;
+  harvestStartMonth?: number | null;
+  harvestStartDay?: number | null;
+  harvestEndMonth?: number | null;
+  harvestEndDay?: number | null;
+  verificationStatus: string;
+  validityPeriod?: string | null;
+  notes?: string | null;
+  source?: AgriDataSource | null;
+}
+
+export interface AgriGrowthProfile {
+  id: string;
+  cropId: string;
+  crop?: { id: string; canonicalName: string };
+  varietyId?: string | null;
+  variety?: { id: string; varietyName: string } | null;
+  minDurationDays: number;
+  typicalDurationDays: number;
+  maxDurationDays: number;
+  gddRequirementMin?: number | null;
+  gddRequirementTypical?: number | null;
+  gddRequirementMax?: number | null;
+  gddBaseTempC?: number | null;
+  gddUpperThresholdC?: number | null;
+  gddMethod?: string | null;
+  verificationStatus: string;
+  source?: AgriDataSource | null;
+}
+
+export interface AgriSuitabilityProfile {
+  id: string;
+  cropId: string;
+  crop?: { id: string; canonicalName: string };
+  soilTypes?: string | null;
+  soilPhMin?: number | null;
+  soilPhMax?: number | null;
+  minTempC?: number | null;
+  maxTempC?: number | null;
+  optTempMinC?: number | null;
+  optTempMaxC?: number | null;
+  annualRainfallMinMm?: number | null;
+  annualRainfallMaxMm?: number | null;
+  waterRequirementMm?: number | null;
+  irrigationRequirement?: string | null;
+  drainageRequirement?: string | null;
+  verificationStatus: string;
+  source?: AgriDataSource | null;
+}
+
+export interface AgriDataSource {
+  id: string;
+  sourceName: string;
+  sourceUrl?: string | null;
+  publicationTitle?: string | null;
+  publisher?: string | null;
+  geographicCoverage?: string | null;
+  dataOrigin: string;
+  verificationStatus: string;
+  publicationDate?: string | null;
+}
+
+export interface AgriDataQuality {
+  cropsCount: number;
+  verifiedCropsCount: number;
+  calendarRecordsCount: number;
+  growthProfilesCount: number;
+  gddProfilesCount: number;
+  yieldObservationsCount: number;
+  diseaseMetadataCount: number;
+  verifiedSourcesCount: number;
+}

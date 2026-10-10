@@ -11,6 +11,7 @@ import {
 import type {
   ActivityEvent,
   AppSettings,
+  AreaUnit,
   Crop,
   Farm,
   Forecast,
@@ -1007,7 +1008,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       } catch (err) {
         console.error("[AppStore] Failed to refresh recommendations:", err);
         toast({
-          tone: "caution",
+          tone: "warning",
           title: "Refresh failed",
           description: "Could not generate fresh recommendations from the server.",
         });
@@ -1069,7 +1070,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           }));
         }
         toast({
-          tone: "caution",
+          tone: "warning",
           title: "Status update failed",
           description: "Could not update recommendation status on the server.",
         });

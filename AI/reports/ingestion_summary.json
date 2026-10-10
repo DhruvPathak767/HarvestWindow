@@ -1,0 +1,18 @@
+{
+  "timestamp": "2026-10-10T16:58:02.283354Z",
+  "dry_run": false,
+  "source": "hf_yield",
+  "limit": 100,
+  "runs": {
+    "hf_yield": {
+      "dataset": "dhyann2815/india-crop-yield-prediction",
+      "dry_run": false,
+      "batch_id": "batch_9af867b218484428b1eb",
+      "rows_read": 101,
+      "rows_accepted": 100,
+      "rows_rejected": 0,
+      "rows_inserted": 100,
+      "rejected_count": 0
+    }
+  }
+}

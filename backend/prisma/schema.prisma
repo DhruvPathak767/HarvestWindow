@@ -220,3 +220,280 @@ model Notification {
   @@map("notifications")
 }
 
+// ==========================================
+// Phase AI-1: Agricultural Knowledge Base Models
+// ==========================================
+
+// 5.8 Agricultural Data Source & Provenance
+model AgriculturalDataSource {
+  id                  String    @id @default(cuid())
+  sourceName          String    @unique @db.VarChar(120)
+  sourceUrl           String?   @db.VarChar(500)
+  datasetTitle        String?   @db.VarChar(255)
+  publisher           String?   @db.VarChar(150)
+  license             String?   @db.VarChar(100)
+  geographicCoverage  String?   @db.VarChar(200)
+  dataOrigin          String    @default("official_reference") @db.VarChar(50) // "official_reference" | "observed" | "derived" | "synthetic" | "unknown"
+  publicationDate     DateTime?
+  verificationStatus  String    @default("verified") @db.VarChar(50) // "verified" | "reference_only" | "unverified" | "synthetic"
+  notes               String?   @db.Text
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  calendars           CropCalendar[]
+  growthProfiles      CropGrowthProfile[]
+  suitabilityProfiles CropSuitabilityProfile[]
+  varieties           CropVariety[]
+  importBatches       AgriculturalImportBatch[]
+
+  @@map("agricultural_data_sources")
+}
+
+// 5.9 Agricultural Import Batch Tracking
+model AgriculturalImportBatch {
+  id               String                  @id @default(cuid())
+  sourceId         String?                 @db.VarChar(191)
+  datasetName      String                  @db.VarChar(150)
+  startedAt        DateTime                @default(now())
+  completedAt      DateTime?
+  rowsRead         Int                     @default(0)
+  rowsAccepted     Int                     @default(0)
+  rowsRejected     Int                     @default(0)
+  rowsInserted     Int                     @default(0)
+  rowsUpdated      Int                     @default(0)
+  rowsSkipped      Int                     @default(0)
+  status           String                  @default("in_progress") @db.VarChar(30) // "in_progress" | "completed" | "failed" | "dry_run"
+  errorSummary     String?                 @db.Text
+  rejectedDetails  String?                 @db.LongText // JSON array of sample rejected records with reasons
+  createdAt        DateTime                @default(now())
+
+  source           AgriculturalDataSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+
+  @@index([datasetName])
+  @@index([status])
+  @@map("agricultural_import_batches")
+}
+
+// 5.1 Canonical Crop Master
+model CropMaster {
+  id             String                   @id @default(cuid())
+  name           String                   @unique @db.VarChar(120)
+  scientificName String?                  @db.VarChar(150)
+  category       String                   @db.VarChar(60) // "Cereals" | "Pulses" | "Oilseeds" | "Commercial" | "Vegetables" | "Fruits" | "Spices" | "Fiber"
+  description    String?                  @db.Text
+  isActive       Boolean                  @default(true)
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  varieties      CropVariety[]
+  calendars      CropCalendar[]
+  growthProfiles CropGrowthProfile[]
+  suitabilities  CropSuitabilityProfile[]
+
+  @@index([category])
+  @@index([isActive])
+  @@map("crop_masters")
+}
+
+// 5.2 Crop Variety
+model CropVariety {
+  id                      String                  @id @default(cuid())
+  cropId                  String                  @db.VarChar(191)
+  name                    String                  @db.VarChar(120)
+  officialCode            String?                 @db.VarChar(100)
+  regionRecommendation    String?                 @db.Text
+  typicalDurationMinDays  Int?
+  typicalDurationMaxDays  Int?
+  sourceId                String?                 @db.VarChar(191)
+  verificationStatus      String                  @default("unverified") @db.VarChar(50)
+  isActive                Boolean                 @default(true)
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+
+  crop                    CropMaster              @relation(fields: [cropId], references: [id], onDelete: Cascade)
+  source                  AgriculturalDataSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  calendars               CropCalendar[]
+  growthProfiles          CropGrowthProfile[]
+
+  @@unique([cropId, name])
+  @@index([cropId])
+  @@map("crop_varieties")
+}
+
+// 5.4 Agricultural Season
+model CropSeason {
+  id                 String         @id @default(cuid())
+  name               String         @unique @db.VarChar(60) // "Kharif" | "Rabi" | "Zaid" | "Whole Year"
+  description        String?        @db.Text
+  monthsCovered      String?        @db.VarChar(100)
+  geographicCoverage String?        @default("India") @db.VarChar(100)
+  verificationStatus String         @default("verified") @db.VarChar(50)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  calendars          CropCalendar[]
+
+  @@map("crop_seasons")
+}
+
+// 5.3 Agricultural Region (States & Districts)
+model AgriculturalRegion {
+  id          String                 @id @default(cuid())
+  country     String                 @default("India") @db.VarChar(100)
+  state       String                 @db.VarChar(100)
+  district    String?                @db.VarChar(100)
+  zone        String?                @db.VarChar(120) // e.g. "Zone 4: Middle Gangetic Plain"
+  latitude    Decimal?               @db.Decimal(10, 6)
+  longitude   Decimal?               @db.Decimal(10, 6)
+  provenance  String?                @db.VarChar(150)
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  calendars   CropCalendar[]
+  yieldRecords CropYieldObservation[]
+
+  @@unique([state, district])
+  @@index([state])
+  @@index([district])
+  @@map("agricultural_regions")
+}
+
+// 5.5 Regional Sowing & Harvest Crop Calendar
+model CropCalendar {
+  id                  String                  @id @default(cuid())
+  cropId              String                  @db.VarChar(191)
+  varietyId           String?                 @db.VarChar(191)
+  regionId            String                  @db.VarChar(191)
+  seasonId            String                  @db.VarChar(191)
+  sowingStartMonth    Int                     // 1 - 12
+  sowingStartDay      Int?                    // 1 - 31
+  sowingEndMonth      Int                     // 1 - 12
+  sowingEndDay        Int?                    // 1 - 31
+  harvestStartMonth   Int?                    // 1 - 12
+  harvestStartDay     Int?                    // 1 - 31
+  harvestEndMonth     Int?                    // 1 - 12
+  harvestEndDay       Int?                    // 1 - 31
+  crossesYearBoundary Boolean                 @default(false)
+  sourceId            String?                 @db.VarChar(191)
+  verificationStatus  String                  @default("reference_only") @db.VarChar(50)
+  validityYear        String?                 @db.VarChar(50)
+  notes               String?                 @db.Text
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  crop                CropMaster              @relation(fields: [cropId], references: [id], onDelete: Cascade)
+  variety             CropVariety?            @relation(fields: [varietyId], references: [id], onDelete: SetNull)
+  region              AgriculturalRegion      @relation(fields: [regionId], references: [id], onDelete: Cascade)
+  season              CropSeason              @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  source              AgriculturalDataSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+
+  @@index([cropId, regionId, seasonId])
+  @@index([regionId])
+  @@index([seasonId])
+  @@map("crop_calendars")
+}
+
+// 5.6 Crop Growth & GDD Profile
+model CropGrowthProfile {
+  id                        String                  @id @default(cuid())
+  cropId                    String                  @db.VarChar(191)
+  varietyId                 String?                 @db.VarChar(191)
+  minDurationDays           Int
+  typicalDurationDays       Int
+  maxDurationDays           Int
+  baseTemperature           Decimal?                @db.Decimal(5, 2) // Base temp Tbase in Celsius
+  upperTemperatureThreshold Decimal?                @db.Decimal(5, 2) // Upper threshold in Celsius
+  gddRequirementMin         Decimal?                @db.Decimal(8, 2) // Growing Degree Days
+  gddRequirementTypical     Decimal?                @db.Decimal(8, 2)
+  gddRequirementMax         Decimal?                @db.Decimal(8, 2)
+  gddMethod                 String?                 @db.VarChar(120) // e.g. "Standard Daily Mean: max(0, (Tmax+Tmin)/2 - Tbase)"
+  stageDurationsJson        String?                 @db.Text // JSON breakdown e.g. {"germination": 7, "vegetative": 40, "flowering": 25, "ripening": 30}
+  conditions                String?                 @db.Text
+  sourceId                  String?                 @db.VarChar(191)
+  verificationStatus        String                  @default("verified") @db.VarChar(50)
+  createdAt                 DateTime                @default(now())
+  updatedAt                 DateTime                @updatedAt
+
+  crop                      CropMaster              @relation(fields: [cropId], references: [id], onDelete: Cascade)
+  variety                   CropVariety?            @relation(fields: [varietyId], references: [id], onDelete: SetNull)
+  source                    AgriculturalDataSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+
+  @@index([cropId])
+  @@index([varietyId])
+  @@map("crop_growth_profiles")
+}
+
+// 5.7 Crop Environmental & Soil Suitability Profile
+model CropSuitabilityProfile {
+  id                          String                  @id @default(cuid())
+  cropId                      String                  @db.VarChar(191)
+  soilTypes                   String?                 @db.Text // e.g. "Alluvial, Deep Black Soil, Loamy"
+  soilPhMin                   Decimal?                @db.Decimal(4, 2)
+  soilPhMax                   Decimal?                @db.Decimal(4, 2)
+  tempMinC                    Decimal?                @db.Decimal(5, 2)
+  tempMaxC                    Decimal?                @db.Decimal(5, 2)
+  rainfallMinMm               Decimal?                @db.Decimal(8, 2)
+  rainfallMaxMm               Decimal?                @db.Decimal(8, 2)
+  waterRequirementDescription String?                 @db.Text
+  drainageRequirement         String?                 @db.VarChar(100)
+  soilConstraints             String?                 @db.Text
+  geographicApplicability     String?                 @db.VarChar(150)
+  sourceId                    String?                 @db.VarChar(191)
+  verificationStatus          String                  @default("verified") @db.VarChar(50)
+  createdAt                   DateTime                @default(now())
+  updatedAt                   DateTime                @updatedAt
+
+  crop                        CropMaster              @relation(fields: [cropId], references: [id], onDelete: Cascade)
+  source                      AgriculturalDataSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+
+  @@index([cropId])
+  @@map("crop_suitability_profiles")
+}
+
+// Historical Yield Observations (From Kaggle & HF India Crop Yield Dataset)
+model CropYieldObservation {
+  id                    String              @id @default(cuid())
+  cropNameRaw           String              @db.VarChar(120)
+  stateRaw              String              @db.VarChar(100)
+  districtRaw           String?             @db.VarChar(100)
+  seasonRaw             String              @db.VarChar(60)
+  year                  Int
+  areaHectares          Decimal?            @db.Decimal(12, 2)
+  productionTonnes      Decimal?            @db.Decimal(14, 2)
+  yieldTonnesPerHectare Decimal?            @db.Decimal(10, 4)
+  annualRainfallMm      Decimal?            @db.Decimal(8, 2)
+  fertilizerUsageKg     Decimal?            @db.Decimal(18, 2)
+  pesticideUsageKg      Decimal?            @db.Decimal(16, 2)
+  sourceName            String              @db.VarChar(100)
+  isSynthetic           Boolean             @default(false)
+  dataOrigin            String              @default("observed") @db.VarChar(50)
+  verificationStatus    String              @default("reference_only") @db.VarChar(50)
+  regionId              String?             @db.VarChar(191)
+  createdAt             DateTime            @default(now())
+
+  region                AgriculturalRegion? @relation(fields: [regionId], references: [id], onDelete: SetNull)
+
+  @@index([cropNameRaw])
+  @@index([stateRaw])
+  @@index([year])
+  @@index([sourceName])
+  @@map("crop_yield_observations")
+}
+
+// Crop Disease Dataset Metadata Inventory (From DigiGreen/Crop_Disease_Images)
+model CropDiseaseMetadata {
+  id            String   @id @default(cuid())
+  crop          String   @db.VarChar(100)
+  diagnosis     String   @db.VarChar(150)
+  details       String?  @db.Text
+  country       String?  @db.VarChar(100)
+  state         String?  @db.VarChar(100)
+  imageFileRef  String   @db.VarChar(255)
+  sourceDataset String   @default("DigiGreen/Crop_Disease_Images") @db.VarChar(120)
+  createdAt     DateTime @default(now())
+
+  @@index([crop])
+  @@index([diagnosis])
+  @@map("crop_disease_metadata")
+}
+

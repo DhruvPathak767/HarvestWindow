@@ -8,6 +8,14 @@ import type {
   Recommendation,
   RecommendationStatus,
   WeatherSummary,
+  AgriCrop,
+  AgriSeason,
+  AgriRegion,
+  AgriCropCalendar,
+  AgriGrowthProfile,
+  AgriSuitabilityProfile,
+  AgriDataSource,
+  AgriDataQuality,
 } from "@/types";
 import {
   buildEmptySnapshot,
@@ -330,6 +338,40 @@ export interface HarvestWindowApi {
   resetDemoData(): Promise<PersistedSnapshot>;
   getFarmWeather(farmId: string, refresh?: boolean): Promise<any>;
   getCurrentLocationWeather(latitude: number, longitude: number): Promise<any>;
+
+  // Phase AI-1: Agricultural Knowledge Base
+  listAgriCrops(params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    category?: string;
+    season?: string;
+    state?: string;
+    district?: string;
+    hasGrowthProfile?: boolean;
+  }): Promise<{ crops: AgriCrop[]; pagination: any }>;
+  getAgriCrop(cropId: string): Promise<AgriCrop | null>;
+  listAgriSeasons(): Promise<AgriSeason[]>;
+  listAgriRegions(params?: { state?: string; search?: string }): Promise<AgriRegion[]>;
+  getCropCalendars(params?: {
+    crop?: string;
+    cropId?: string;
+    state?: string;
+    district?: string;
+    season?: string;
+    year?: string;
+  }): Promise<AgriCropCalendar[]>;
+  getCropGrowthProfiles(params?: {
+    crop?: string;
+    cropId?: string;
+    variety?: string;
+  }): Promise<AgriGrowthProfile[]>;
+  getCropSuitability(params?: {
+    crop?: string;
+    cropId?: string;
+  }): Promise<AgriSuitabilityProfile[]>;
+  getDataSources(): Promise<AgriDataSource[]>;
+  getAgriDataQuality(): Promise<AgriDataQuality | null>;
 }
 
 function normalizeForecast(raw: any): Forecast {
@@ -1281,6 +1323,171 @@ export const api: HarvestWindowApi = {
       }
     }
     return { generated: 0 };
+  },
+
+  // --- Phase AI-1: Agricultural Knowledge Base ---
+  async listAgriCrops(params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    category?: string;
+    season?: string;
+    state?: string;
+    district?: string;
+    hasGrowthProfile?: boolean;
+  } = {}) {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const q = new URLSearchParams();
+        if (params.page) q.set("page", String(params.page));
+        if (params.limit) q.set("limit", String(params.limit));
+        if (params.search) q.set("search", params.search);
+        if (params.category) q.set("category", params.category);
+        if (params.season) q.set("season", params.season);
+        if (params.state) q.set("state", params.state);
+        if (params.district) q.set("district", params.district);
+        if (params.hasGrowthProfile !== undefined) q.set("hasGrowthProfile", String(params.hasGrowthProfile));
+        const res = await apiRequest<{ success: boolean; data: { crops: AgriCrop[]; pagination: unknown } }>(
+          `/agriculture/crops?${q.toString()}`
+        );
+        return res.data;
+      } catch (err) {
+        console.warn("[HarvestWindow API] listAgriCrops failed:", err);
+      }
+    }
+    return { crops: [] as AgriCrop[], pagination: { total: 0, page: 1, limit: 50, totalPages: 0 } };
+  },
+
+  async getAgriCrop(cropId: string) {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const res = await apiRequest<{ success: boolean; data: AgriCrop }>(`/agriculture/crops/${cropId}`);
+        return res.data;
+      } catch (err) {
+        console.warn("[HarvestWindow API] getAgriCrop failed:", err);
+      }
+    }
+    return null;
+  },
+
+  async listAgriSeasons() {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const res = await apiRequest<{ success: boolean; data: AgriSeason[] }>("/agriculture/seasons");
+        return res.data;
+      } catch (err) {
+        console.warn("[HarvestWindow API] listAgriSeasons failed:", err);
+      }
+    }
+    return [] as AgriSeason[];
+  },
+
+  async listAgriRegions(params: { state?: string; search?: string } = {}) {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const q = new URLSearchParams();
+        if (params.state) q.set("state", params.state);
+        if (params.search) q.set("search", params.search);
+        const res = await apiRequest<{
+          success: boolean;
+          data: { items: AgriRegion[]; pagination?: unknown } | AgriRegion[];
+        }>(`/agriculture/regions?${q.toString()}`);
+        if (!res?.data) return [] as AgriRegion[];
+        if (Array.isArray(res.data)) return res.data;
+        if (Array.isArray((res.data as any).items)) return (res.data as any).items;
+        return [] as AgriRegion[];
+      } catch (err) {
+        console.warn("[HarvestWindow API] listAgriRegions failed:", err);
+      }
+    }
+    return [] as AgriRegion[];
+  },
+
+  async getCropCalendars(params: {
+    crop?: string;
+    cropId?: string;
+    state?: string;
+    district?: string;
+    season?: string;
+    year?: string;
+  } = {}) {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const q = new URLSearchParams();
+        if (params.crop) q.set("crop", params.crop);
+        if (params.cropId) q.set("cropId", params.cropId);
+        if (params.state) q.set("state", params.state);
+        if (params.district) q.set("district", params.district);
+        if (params.season) q.set("season", params.season);
+        if (params.year) q.set("year", params.year);
+        const res = await apiRequest<{
+          success: boolean;
+          data: { items: AgriCropCalendar[]; pagination?: unknown } | AgriCropCalendar[];
+        }>(`/agriculture/crop-calendar?${q.toString()}`);
+        if (!res?.data) return [] as AgriCropCalendar[];
+        if (Array.isArray(res.data)) return res.data;
+        if (Array.isArray((res.data as any).items)) return (res.data as any).items;
+        return [] as AgriCropCalendar[];
+      } catch (err) {
+        console.warn("[HarvestWindow API] getCropCalendars failed:", err);
+      }
+    }
+    return [] as AgriCropCalendar[];
+  },
+
+  async getCropGrowthProfiles(params: { crop?: string; cropId?: string; variety?: string } = {}) {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const q = new URLSearchParams();
+        if (params.crop) q.set("crop", params.crop);
+        if (params.cropId) q.set("cropId", params.cropId);
+        if (params.variety) q.set("variety", params.variety);
+        const res = await apiRequest<{ success: boolean; data: AgriGrowthProfile[] }>(`/agriculture/crop-growth-profiles?${q.toString()}`);
+        return res.data;
+      } catch (err) {
+        console.warn("[HarvestWindow API] getCropGrowthProfiles failed:", err);
+      }
+    }
+    return [] as AgriGrowthProfile[];
+  },
+
+  async getCropSuitability(params: { crop?: string; cropId?: string } = {}) {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const q = new URLSearchParams();
+        if (params.crop) q.set("crop", params.crop);
+        if (params.cropId) q.set("cropId", params.cropId);
+        const res = await apiRequest<{ success: boolean; data: AgriSuitabilityProfile[] }>(`/agriculture/crop-suitability?${q.toString()}`);
+        return res.data;
+      } catch (err) {
+        console.warn("[HarvestWindow API] getCropSuitability failed:", err);
+      }
+    }
+    return [] as AgriSuitabilityProfile[];
+  },
+
+  async getDataSources() {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const res = await apiRequest<{ success: boolean; data: AgriDataSource[] }>("/agriculture/data-sources");
+        return res.data;
+      } catch (err) {
+        console.warn("[HarvestWindow API] getDataSources failed:", err);
+      }
+    }
+    return [] as AgriDataSource[];
+  },
+
+  async getAgriDataQuality() {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const res = await apiRequest<{ success: boolean; data: AgriDataQuality }>("/agriculture/data-quality");
+        return res.data;
+      } catch (err) {
+        console.warn("[HarvestWindow API] getAgriDataQuality failed:", err);
+      }
+    }
+    return null;
   },
 };
 

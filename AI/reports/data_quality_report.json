@@ -1,0 +1,380 @@
+{
+  "generatedAt": "2026-10-10 16:58:30 UTC",
+  "metrics": {
+    "totalCrops": 15,
+    "totalVarieties": 31,
+    "totalSeasons": 3,
+    "totalRegions": 31,
+    "totalCalendars": 31,
+    "totalGrowthProfiles": 15,
+    "totalGDDProfiles": 15,
+    "totalSuitabilityProfiles": 15,
+    "totalYieldObservations": 2054,
+    "totalDiseaseMetadata": 50,
+    "totalDataSources": 28,
+    "totalImportBatches": 5
+  },
+  "calendarVerificationBreakdown": {
+    "verified": 31
+  },
+  "dataSources": [
+    {
+      "name": "Kaggle/Indian-Crop-Production",
+      "origin": "observed",
+      "verification": "reference_only"
+    },
+    {
+      "name": "ICAR-CICR Nagpur Cotton Guide",
+      "origin": "official_reference",
+      "verification": "verified"
+    },
+    {
+      "name": "PJTSAU Crop Production Guide",
+      "origin": "official_reference",
+      "verification": "verified"
+    },
+    {
+      "name": "ICAR-DRMR Bharatpur Mustard Portal",
+      "origin": "official_reference",
+      "verification": "verified"
+    },
+    {
+      "name": "HuggingFace/dhyann2815/india-crop-yield-prediction",
+      "origin": "derived",
+      "verification": "reference_only"
+    },
+    {
+      "name": "ANGRAU Agricultural Calendar",
+      "origin": "official_reference",
+      "verification": "verified"
+    },
+    {
+      "name": "UAS Raichur Package of Practices",
+      "origin": "official_reference",
+      "verification": "verified"
+    },
+    {
+      "name": "NRRI Cuttack Advisory",
+      "origin": "official_reference",
+      "verification": "verified"
+    },
+    {
+      "name": "SKNAU Jobner Pulse Calendar",
+      "origin": "official_reference",
+      "verification": "verified"
+    },
+    {
+      "name": "ICAR-IISR Indore Soybean Handout",
+      "origin": "official_reference",
+      "verification": "verified"
+    },
+    {
+      "name": "ICAR-IIPR Kanpur Pulses Guidelines",
+      "origin": "official_reference",
+      "verification": "verified"
+    },
+    {
+      "name": "ICAR-IIWBR Karnal Wheat Calendar",
+      "origin": "official_reference",
+      "verification": "verified"
+    },
+    {
+      "name": "RAU Pusa Agronomy Handout",
+      "origin": "official_reference",
+      "verification": "verified"
+    },
+    {
+      "name": "CCSHAU Hisar Mustard Advisory",
+      "origin": "official_reference",
+      "verification": "verified"
+    },
+    {
+      "name": "ICAR-IIMR Sorghum Advisory",
+      "origin": "official_reference",
+      "verification": "verified"
+    },
+    {
+      "name": "ICAR-IISR Lucknow Cane Advisory",
+      "origin": "official_reference",
+      "verification": "verified"
+    },
+    {
+      "name": "RVSKVV Gwalior Agronomy Guidelines",
+      "origin": "official_reference",
+      "verification": "verified"
+    },
+    {
+      "name": "PAU Ludhiana Wheat Advisory",
+      "origin": "official_reference",
+      "verification": "verified"
+    },
+    {
+      "name": "IIHR Bangalore Vegetable Calendar",
+      "origin": "official_reference",
+      "verification": "verified"
+    },
+    {
+      "name": "PDKV Akola Cotton Recommendations",
+      "origin": "official_reference",
+      "verification": "verified"
+    },
+    {
+      "name": "ICAR-IIMR Maize Advisory",
+      "origin": "official_reference",
+      "verification": "verified"
+    },
+    {
+      "name": "ICAR-IARI Crop Calendar",
+      "origin": "official_reference",
+      "verification": "verified"
+    },
+    {
+      "name": "HuggingFace/DigiGreen/Crop_Disease_Images",
+      "origin": "observed",
+      "verification": "reference_only"
+    },
+    {
+      "name": "ICAR-DGR Junagadh Advisory",
+      "origin": "official_reference",
+      "verification": "verified"
+    },
+    {
+      "name": "ICAR-DOGR Rajgurunagar Onion Advisory",
+      "origin": "official_reference",
+      "verification": "verified"
+    },
+    {
+      "name": "ICAR-CAZRI Jodhpur Bajra Leaflet",
+      "origin": "official_reference",
+      "verification": "verified"
+    },
+    {
+      "name": "MPKV Rahuri Sugarcane Package",
+      "origin": "official_reference",
+      "verification": "verified"
+    },
+    {
+      "name": "ICAR-CPRI Shimla Potato Manual",
+      "origin": "official_reference",
+      "verification": "verified"
+    }
+  ],
+  "stateCoverage": [
+    {
+      "state": "Andhra Pradesh",
+      "districtCount": 1
+    },
+    {
+      "state": "Bihar",
+      "districtCount": 1
+    },
+    {
+      "state": "Gujarat",
+      "districtCount": 2
+    },
+    {
+      "state": "Haryana",
+      "districtCount": 2
+    },
+    {
+      "state": "Karnataka",
+      "districtCount": 4
+    },
+    {
+      "state": "Madhya Pradesh",
+      "districtCount": 3
+    },
+    {
+      "state": "Maharashtra",
+      "districtCount": 7
+    },
+    {
+      "state": "Odisha",
+      "districtCount": 1
+    },
+    {
+      "state": "Punjab",
+      "districtCount": 2
+    },
+    {
+      "state": "Rajasthan",
+      "districtCount": 3
+    },
+    {
+      "state": "Telangana",
+      "districtCount": 1
+    },
+    {
+      "state": "Uttar Pradesh",
+      "districtCount": 3
+    },
+    {
+      "state": "West Bengal",
+      "districtCount": 1
+    }
+  ],
+  "crops": [
+    {
+      "crop": "Maize",
+      "category": "Cereals",
+      "calendars": 2,
+      "hasGrowthProfile": true,
+      "hasGDD": true,
+      "hasSuitability": true
+    },
+    {
+      "crop": "Pearl Millet",
+      "category": "Cereals",
+      "calendars": 1,
+      "hasGrowthProfile": true,
+      "hasGDD": true,
+      "hasSuitability": true
+    },
+    {
+      "crop": "Rice",
+      "category": "Cereals",
+      "calendars": 5,
+      "hasGrowthProfile": true,
+      "hasGDD": true,
+      "hasSuitability": true
+    },
+    {
+      "crop": "Sorghum",
+      "category": "Cereals",
+      "calendars": 1,
+      "hasGrowthProfile": true,
+      "hasGDD": true,
+      "hasSuitability": true
+    },
+    {
+      "crop": "Wheat",
+      "category": "Cereals",
+      "calendars": 4,
+      "hasGrowthProfile": true,
+      "hasGDD": true,
+      "hasSuitability": true
+    },
+    {
+      "crop": "Sugarcane",
+      "category": "Commercial",
+      "calendars": 2,
+      "hasGrowthProfile": true,
+      "hasGDD": true,
+      "hasSuitability": true
+    },
+    {
+      "crop": "Cotton",
+      "category": "Fiber",
+      "calendars": 2,
+      "hasGrowthProfile": true,
+      "hasGDD": true,
+      "hasSuitability": true
+    },
+    {
+      "crop": "Groundnut",
+      "category": "Oilseeds",
+      "calendars": 1,
+      "hasGrowthProfile": true,
+      "hasGDD": true,
+      "hasSuitability": true
+    },
+    {
+      "crop": "Mustard",
+      "category": "Oilseeds",
+      "calendars": 2,
+      "hasGrowthProfile": true,
+      "hasGDD": true,
+      "hasSuitability": true
+    },
+    {
+      "crop": "Soybean",
+      "category": "Oilseeds",
+      "calendars": 2,
+      "hasGrowthProfile": true,
+      "hasGDD": true,
+      "hasSuitability": true
+    },
+    {
+      "crop": "Chickpea",
+      "category": "Pulses",
+      "calendars": 2,
+      "hasGrowthProfile": true,
+      "hasGDD": true,
+      "hasSuitability": true
+    },
+    {
+      "crop": "Pigeon Pea",
+      "category": "Pulses",
+      "calendars": 1,
+      "hasGrowthProfile": true,
+      "hasGDD": true,
+      "hasSuitability": true
+    },
+    {
+      "crop": "Onion",
+      "category": "Vegetables",
+      "calendars": 2,
+      "hasGrowthProfile": true,
+      "hasGDD": true,
+      "hasSuitability": true
+    },
+    {
+      "crop": "Potato",
+      "category": "Vegetables",
+      "calendars": 2,
+      "hasGrowthProfile": true,
+      "hasGDD": true,
+      "hasSuitability": true
+    },
+    {
+      "crop": "Tomato",
+      "category": "Vegetables",
+      "calendars": 2,
+      "hasGrowthProfile": true,
+      "hasGDD": true,
+      "hasSuitability": true
+    }
+  ],
+  "recentImportBatches": [
+    {
+      "dataset": "dhyann2815/india-crop-yield-prediction",
+      "status": "completed",
+      "rowsRead": 101,
+      "rowsAccepted": 100,
+      "rowsRejected": 0,
+      "rowsInserted": 100
+    },
+    {
+      "dataset": "DigiGreen/Crop_Disease_Images",
+      "status": "completed",
+      "rowsRead": 51,
+      "rowsAccepted": 50,
+      "rowsRejected": 0,
+      "rowsInserted": 50
+    },
+    {
+      "dataset": "dhyann2815/india-crop-yield-prediction",
+      "status": "failed",
+      "rowsRead": 101,
+      "rowsAccepted": 100,
+      "rowsRejected": 0,
+      "rowsInserted": 0
+    },
+    {
+      "dataset": "crop_production.csv",
+      "status": "completed",
+      "rowsRead": 2001,
+      "rowsAccepted": 1954,
+      "rowsRejected": 46,
+      "rowsInserted": 1954
+    },
+    {
+      "dataset": "verified_indian_crop_calendar.csv",
+      "status": "completed",
+      "rowsRead": 31,
+      "rowsAccepted": 31,
+      "rowsRejected": 0,
+      "rowsInserted": 46
+    }
+  ]
+}

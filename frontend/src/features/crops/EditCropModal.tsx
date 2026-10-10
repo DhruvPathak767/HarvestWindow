@@ -12,9 +12,10 @@ import {
   TextField,
 } from "@/components/common/fields";
 import { CROP_CATALOG, findCatalogEntry } from "@/data/mock/cropCatalog";
-import { STAGE_TEMPLATES, type Crop } from "@/types";
+import { STAGE_TEMPLATES, type Crop, type AgriCrop } from "@/types";
 import { addDays, startOfToday, toISODate } from "@/utils/date";
 import { useStore } from "@/store/AppStore";
+import { api } from "@/services/api";
 
 const schema = z.object({
   cropName: z.string().min(2, "Choose the crop for this block"),
@@ -59,6 +60,7 @@ export function EditCropModal({
   const { farms, updateCrop } = useStore();
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [dbCrops, setDbCrops] = useState<AgriCrop[]>([]);
 
   const {
     register,
@@ -66,6 +68,7 @@ export function EditCropModal({
     control,
     watch,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -81,6 +84,22 @@ export function EditCropModal({
       notes: crop.notes ?? "",
     },
   });
+
+  useEffect(() => {
+    let cancelled = false;
+    if (open) {
+      api.listAgriCrops({ limit: 100 })
+        .then((res: { crops: AgriCrop[]; pagination: unknown }) => {
+          if (!cancelled && res?.crops && res.crops.length > 0) {
+            setDbCrops(res.crops);
+          }
+        })
+        .catch(() => {});
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   useEffect(() => {
     if (crop) {
@@ -100,6 +119,38 @@ export function EditCropModal({
 
   const cropName = watch("cropName");
   const entry = useMemo(() => findCatalogEntry(cropName), [cropName]);
+  const matchedAgriCrop = useMemo(() => {
+    if (!cropName) return null;
+    return (
+      dbCrops.find(
+        (c) => c.canonicalName.toLowerCase() === cropName.toLowerCase().trim()
+      ) || null
+    );
+  }, [dbCrops, cropName]);
+
+  const cropOptions = useMemo(() => {
+    if (dbCrops.length > 0) {
+      return dbCrops.map((c) => {
+        const dur = c.growthProfiles?.[0]
+          ? `${c.growthProfiles[0].minDurationDays}–${c.growthProfiles[0].maxDurationDays} days`
+          : null;
+        const meta = [c.category, dur, c.scientificName ? `(${c.scientificName})` : null]
+          .filter(Boolean)
+          .join(" · ");
+        return {
+          value: c.canonicalName,
+          label: c.canonicalName,
+          meta,
+        };
+      });
+    }
+    return CROP_CATALOG.map((c) => ({
+      value: c.name,
+      label: c.name,
+      meta: `${c.seasons.join(" / ")} · ${c.durationRange[0]}–${c.durationRange[1]} days`,
+    }));
+  }, [dbCrops]);
+
   const stageOptions = useMemo(() => {
     if (!entry) return [];
     const stages = STAGE_TEMPLATES[entry.stageTemplateName] as readonly string[];
@@ -181,11 +232,7 @@ export function EditCropModal({
                 onChange={field.onChange}
                 error={errors.cropName?.message}
                 hint="Searchable list of common Indian crops."
-                options={CROP_CATALOG.map((c) => ({
-                  value: c.name,
-                  label: c.name,
-                  meta: `${c.seasons.join(" / ")} · ${c.durationRange[0]}–${c.durationRange[1]} days`,
-                }))}
+                options={cropOptions}
               />
             )}
           />
@@ -197,6 +244,23 @@ export function EditCropModal({
             {...register("variety")}
           />
         </div>
+
+        {/* Variety recommendation chips if available from knowledge base */}
+        {matchedAgriCrop?.varieties && matchedAgriCrop.varieties.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted -mt-2">
+            <span className="font-medium text-forest-deep">Verified varieties:</span>
+            {matchedAgriCrop.varieties.map((v) => (
+              <button
+                key={v.id}
+                type="button"
+                onClick={() => setValue("variety", v.varietyName)}
+                className="cursor-pointer rounded bg-soft hover:bg-forest/10 px-2 py-0.5 text-forest-deep transition-colors font-mono border border-line/60"
+              >
+                + {v.varietyName}
+              </button>
+            ))}
+          </div>
+        )}
 
         {entry && (
           <div className="flex items-start gap-2.5 rounded-md border border-line bg-soft/70 px-3.5 py-3">

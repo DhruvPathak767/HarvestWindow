@@ -347,9 +347,9 @@ export default function WeatherPage() {
           />
           <div className="flex flex-col gap-3 p-5">
             {cautions.length > 0 ? (
-              cautions.map((c) => (
+              cautions.map((c, idx) => (
                 <div
-                  key={c.id}
+                  key={c.id ? `${c.id}-${idx}` : `caution-${idx}`}
                   className={cn(
                     "rounded-md border p-4",
                     c.level === "caution"

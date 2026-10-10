@@ -27,6 +27,7 @@ import { RecommendationCard } from "@/features/recommendations/RecommendationCar
 import { CROP_IMAGES, findCatalogEntry } from "@/data/mock/cropCatalog";
 import { useStore } from "@/store/AppStore";
 import { EditCropModal } from "./EditCropModal";
+import { AgronomicKnowledgeCard } from "./AgronomicKnowledgeCard";
 import { weatherService, CONDITION_LABEL } from "@/services/weather/weatherService";
 import { daysLabel, formatDate, formatTime, relativeTime } from "@/utils/date";
 import { cn } from "@/utils/cn";
@@ -332,9 +333,9 @@ export default function CropDetailPage() {
                 />
                 {farmWeather.cautions.length > 0 ? (
                   <ul className="mt-4 flex flex-col gap-2">
-                    {farmWeather.cautions.map((c) => (
+                    {farmWeather.cautions.map((c, idx) => (
                       <li
-                        key={c.id}
+                        key={c.id ? `${c.id}-${idx}` : `caution-${idx}`}
                         className={cn(
                           "rounded-md border px-3.5 py-2.5",
                           c.level === "caution"
@@ -369,6 +370,16 @@ export default function CropDetailPage() {
             )}
           </Card>
         </div>
+      </section>
+
+      {/* Verified Agronomic Knowledge Base (Phase AI-1) */}
+      <section aria-label="Agronomic Knowledge Base">
+        <AgronomicKnowledgeCard
+          cropName={crop.name}
+          cropVariety={crop.variety}
+          farmState={farm?.state}
+          farmDistrict={farm?.district}
+        />
       </section>
 
       {/* Growth progression + explanation */}

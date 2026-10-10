@@ -1,10 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Info, Sprout } from "lucide-react";
+import { Award, Compass, Sprout } from "lucide-react";
 import { Modal } from "@/components/common/Modal";
-import { Button } from "@/components/common/ui";
+import { Badge, Button } from "@/components/common/ui";
 import {
   SearchableSelect,
   SelectField,
@@ -12,9 +12,10 @@ import {
   TextField,
 } from "@/components/common/fields";
 import { CROP_CATALOG, findCatalogEntry } from "@/data/mock/cropCatalog";
-import { STAGE_TEMPLATES } from "@/types";
+import { STAGE_TEMPLATES, type AgriCrop, type AgriCropCalendar } from "@/types";
 import { addDays, startOfToday, toISODate } from "@/utils/date";
 import { ALL_FARMS, useStore } from "@/store/AppStore";
+import { api } from "@/services/api";
 
 const schema = z.object({
     cropName: z.string().min(2, "Choose the crop for this block"),
@@ -60,6 +61,8 @@ export function AddCropModal({
   const { farms, addCrop, selectedFarmId } = useStore();
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [dbCrops, setDbCrops] = useState<AgriCrop[]>([]);
+  const [calendars, setCalendars] = useState<AgriCropCalendar[]>([]);
 
   const initialFarm =
     defaultFarmId ??
@@ -71,6 +74,7 @@ export function AddCropModal({
     control,
     watch,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -89,6 +93,59 @@ export function AddCropModal({
   });
 
   const cropName = watch("cropName");
+  const farmId = watch("farmId");
+  const selectedFarm = useMemo(() => farms.find((f) => f.id === farmId), [farms, farmId]);
+
+  // Load database crops when modal is opened
+  useEffect(() => {
+    let cancelled = false;
+    if (open) {
+      api.listAgriCrops({ limit: 100 })
+        .then((res: { crops: AgriCrop[]; pagination: unknown }) => {
+          if (!cancelled && res?.crops && res.crops.length > 0) {
+            setDbCrops(res.crops);
+          }
+        })
+        .catch((err: unknown) => console.warn("[AddCropModal] Could not fetch agri crops:", err));
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  // Find matching crop in database knowledge base
+  const matchedAgriCrop = useMemo(() => {
+    if (!cropName) return null;
+    return (
+      dbCrops.find(
+        (c) => c.canonicalName.toLowerCase() === cropName.toLowerCase().trim()
+      ) || null
+    );
+  }, [dbCrops, cropName]);
+
+  // Fetch regional calendars when crop or farm changes
+  useEffect(() => {
+    let cancelled = false;
+    if (cropName) {
+      api.getCropCalendars({
+        crop: cropName,
+        state: selectedFarm?.state || undefined,
+      })
+        .then((cals: AgriCropCalendar[]) => {
+          const list = Array.isArray(cals) ? cals : (cals as any)?.items || [];
+          if (!cancelled) setCalendars(list);
+        })
+        .catch(() => {
+          if (!cancelled) setCalendars([]);
+        });
+    } else {
+      setCalendars([]);
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [cropName, selectedFarm?.state]);
+
   const entry = useMemo(() => findCatalogEntry(cropName), [cropName]);
   const stageOptions = useMemo(() => {
     if (!entry) return [];
@@ -98,6 +155,44 @@ export function AddCropModal({
       ...stages.map((s) => ({ value: s, label: s })),
     ];
   }, [entry]);
+
+  // Build options from database if available, otherwise fallback to catalog
+  const cropOptions = useMemo(() => {
+    if (dbCrops.length > 0) {
+      return dbCrops.map((c) => {
+        const dur = c.growthProfiles?.[0]
+          ? `${c.growthProfiles[0].minDurationDays}–${c.growthProfiles[0].maxDurationDays} days`
+          : null;
+        const meta = [c.category, dur, c.scientificName ? `(${c.scientificName})` : null]
+          .filter(Boolean)
+          .join(" · ");
+        return {
+          value: c.canonicalName,
+          label: c.canonicalName,
+          meta,
+        };
+      });
+    }
+    return CROP_CATALOG.map((c) => ({
+      value: c.name,
+      label: c.name,
+      meta: `${c.seasons.join(" / ")} · ${c.durationRange[0]}–${c.durationRange[1]} days`,
+    }));
+  }, [dbCrops]);
+
+  const growthProfile = matchedAgriCrop?.growthProfiles?.[0] || null;
+  const regionalCalendar =
+    calendars.find(
+      (c) =>
+        selectedFarm?.state &&
+        c.region?.state?.toLowerCase().trim() === selectedFarm.state.toLowerCase().trim()
+    ) ||
+    calendars[0] ||
+    null;
+
+  const hasGdd =
+    growthProfile?.gddRequirementMin !== null &&
+    growthProfile?.gddRequirementMin !== undefined;
 
   const onSubmit = async (values: FormValues) => {
     setSubmitting(true);
@@ -173,11 +268,7 @@ export function AddCropModal({
                 onChange={field.onChange}
                 error={errors.cropName?.message}
                 hint="Searchable list of common Indian crops."
-                options={CROP_CATALOG.map((c) => ({
-                  value: c.name,
-                  label: c.name,
-                  meta: `${c.seasons.join(" / ")} · ${c.durationRange[0]}–${c.durationRange[1]} days`,
-                }))}
+                options={cropOptions}
               />
             )}
           />
@@ -190,18 +281,86 @@ export function AddCropModal({
           />
         </div>
 
-        {entry && (
-          <div className="flex items-start gap-2.5 rounded-md border border-line bg-soft/70 px-3.5 py-3">
-            <Info className="mt-0.5 h-4 w-4 shrink-0 text-forest" aria-hidden />
-            <p className="text-[12.5px] leading-relaxed text-forest-deep">
-              <span className="font-semibold">{entry.name}</span> reference duration:{" "}
-              <span className="font-mono">
-                {entry.durationRange[0]}–{entry.durationRange[1]} days
-              </span>{" "}
-              from sowing. {entry.note}
-            </p>
+        {/* Variety recommendation chips if available from knowledge base */}
+        {matchedAgriCrop?.varieties && matchedAgriCrop.varieties.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted -mt-2">
+            <span className="font-medium text-forest-deep">Verified varieties:</span>
+            {matchedAgriCrop.varieties.map((v) => (
+              <button
+                key={v.id}
+                type="button"
+                onClick={() => setValue("variety", v.varietyName)}
+                className="cursor-pointer rounded bg-soft hover:bg-forest/10 px-2 py-0.5 text-forest-deep transition-colors font-mono border border-line/60"
+              >
+                + {v.varietyName}
+              </button>
+            ))}
           </div>
         )}
+
+        {/* Verified Agronomic Knowledge Banner */}
+        {matchedAgriCrop || entry ? (
+          <div className="flex flex-col gap-2 rounded-md border border-forest/20 bg-soft/70 px-3.5 py-3 text-[12px] text-forest-deep">
+            <div className="flex items-center justify-between gap-2 border-b border-line/50 pb-2">
+              <span className="flex items-center gap-1.5 font-bold">
+                <Compass className="h-3.5 w-3.5 text-forest" />
+                <span>
+                  {matchedAgriCrop?.canonicalName || entry?.name} · Agronomic Knowledge Profile
+                </span>
+              </span>
+              <Badge
+                tone={growthProfile?.verificationStatus === "VERIFIED" ? "living" : "neutral"}
+                icon={<Award className="h-3 w-3" />}
+              >
+                {growthProfile?.verificationStatus === "VERIFIED" ? "ICAR Verified" : "Reference Baseline"}
+              </Badge>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2 pt-1 text-[11.5px]">
+              <div>
+                <span className="font-medium">Growth duration:</span>{" "}
+                {growthProfile ? (
+                  <span className="font-mono">
+                    {growthProfile.minDurationDays}–{growthProfile.maxDurationDays} days (Typ:{" "}
+                    {growthProfile.typicalDurationDays}d)
+                  </span>
+                ) : entry ? (
+                  <span className="font-mono">
+                    {entry.durationRange[0]}–{entry.durationRange[1]} days
+                  </span>
+                ) : (
+                  "Not specified"
+                )}
+              </div>
+
+              <div>
+                <span className="font-medium">Regional Calendar:</span>{" "}
+                {regionalCalendar ? (
+                  <span>
+                    {regionalCalendar.region?.state || "National"} ({regionalCalendar.season?.canonicalName})
+                  </span>
+                ) : (
+                  <span className="text-muted">National generalized cycle</span>
+                )}
+              </div>
+
+              <div className="sm:col-span-2">
+                <span className="font-medium">Growing Degree Days (GDD):</span>{" "}
+                {hasGdd && growthProfile ? (
+                  <span className="font-mono text-forest-deep">
+                    {growthProfile.gddRequirementMin?.toLocaleString()}–
+                    {growthProfile.gddRequirementMax?.toLocaleString()} °C-days (Base:{" "}
+                    {growthProfile.gddBaseTempC ?? 10}°C)
+                  </span>
+                ) : (
+                  <span className="text-muted italic">
+                    Not verified for this region/variety yet · Standard calendar duration used
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         <div className="grid gap-4 sm:grid-cols-2">
           <SelectField
