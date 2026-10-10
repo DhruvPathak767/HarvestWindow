@@ -48,7 +48,10 @@ export function buildSeedSnapshot(): PersistedSnapshot {
     crops: structuredClone(SEED_CROPS),
     recommendations: structuredClone(SEED_RECOMMENDATIONS),
     activity: structuredClone(SEED_ACTIVITY),
-    settings: structuredClone(DEFAULT_SETTINGS),
+    settings: {
+      ...DEFAULT_SETTINGS,
+      defaultFarmId: "farm-greenridge",
+    },
     user: structuredClone(DEMO_USER),
     signedIn: false,
     onboarded: false,
@@ -66,7 +69,10 @@ export function buildEmptySnapshot(user?: Partial<UserProfile> | null): Persiste
     crops: [],
     recommendations: [],
     activity: [],
-    settings: structuredClone(DEFAULT_SETTINGS),
+    settings: {
+      ...DEFAULT_SETTINGS,
+      defaultFarmId: null,
+    },
     user: {
       fullName: user?.fullName || "",
       email: user?.email || "",

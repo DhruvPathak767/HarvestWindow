@@ -249,7 +249,7 @@ function Topbar({
   onRefresh: () => void;
 }) {
   const { selectedFarmId, farms } = useStore();
-  const farm = farms.find((f) => f.id === selectedFarmId);
+  const farm = farms.find((f) => f.id === selectedFarmId) ?? farms[0];
 
   return (
     <div className="sticky top-0 z-[70] border-b border-line bg-cream/85 backdrop-blur-md">

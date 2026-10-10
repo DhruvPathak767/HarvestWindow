@@ -189,7 +189,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
       setSnapshot(data);
       hydrated.current = true;
-      setSelectedFarmId(data.settings?.defaultFarmId ?? data.farms[0]?.id ?? ALL_FARMS);
+      const validSelectedFarm = data.farms.some((f) => f.id === data.settings?.defaultFarmId)
+        ? data.settings.defaultFarmId!
+        : (data.farms[0]?.id ?? ALL_FARMS);
+      setSelectedFarmId(validSelectedFarm);
 
       // 3. In live API mode, pull live harvest predictions from prediction engine
       if (API_CONFIG.mode === "live") {
@@ -230,6 +233,16 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setLocale(snapshot.settings.language);
   }, [snapshot.settings.language]);
+
+  // Guard selectedFarmId: if it points to a non-existent farm, fall back to first farm or ALL_FARMS
+  useEffect(() => {
+    if (!ready) return;
+    if (selectedFarmId === ALL_FARMS) return;
+    const exists = snapshot.farms.some((f) => f.id === selectedFarmId);
+    if (!exists) {
+      setSelectedFarmId(snapshot.farms[0]?.id ?? ALL_FARMS);
+    }
+  }, [ready, selectedFarmId, snapshot.farms]);
 
   const patch = useCallback(
     (updater: (prev: PersistedSnapshot) => PersistedSnapshot) =>
@@ -335,9 +348,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         };
 
         setSnapshot(updatedSnapshot);
-        setSelectedFarmId(
-          updatedSnapshot.settings?.defaultFarmId ?? liveFarms[0]?.id ?? ALL_FARMS
-        );
+        const validSelectedFarm = liveFarms.some((f) => f.id === updatedSnapshot.settings?.defaultFarmId)
+          ? updatedSnapshot.settings.defaultFarmId!
+          : (liveFarms[0]?.id ?? ALL_FARMS);
+        setSelectedFarmId(validSelectedFarm);
         localStore.save(updatedSnapshot, result.user.email);
         return { ok: true };
       } catch (err: unknown) {
@@ -658,6 +672,15 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         crops: [...prev.crops.filter((c) => c.id !== crop.id), crop],
         activity: [activity, ...prev.activity].slice(0, 40),
       }));
+
+      if (API_CONFIG.mode === "live") {
+        void api.getForecast(crop.id).then((fc) => {
+          if (fc) {
+            setServerForecasts((prev) => ({ ...prev, [crop.id]: fc }));
+          }
+        }).catch(() => {});
+      }
+
       toast({
         tone: "success",
         title: `${crop.name} added`,
@@ -676,6 +699,15 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         crops: prev.crops.map((c) => (c.id === id ? crop : c)),
         activity: [activity, ...prev.activity].slice(0, 40),
       }));
+
+      if (API_CONFIG.mode === "live") {
+        void api.getForecast(crop.id).then((fc) => {
+          if (fc) {
+            setServerForecasts((prev) => ({ ...prev, [crop.id]: fc }));
+          }
+        }).catch(() => {});
+      }
+
       toast({
         tone: "success",
         title: `${crop.name} updated`,

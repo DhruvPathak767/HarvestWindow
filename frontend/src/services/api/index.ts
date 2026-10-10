@@ -222,6 +222,26 @@ export interface HarvestWindowApi {
   resetDemoData(): Promise<PersistedSnapshot>;
 }
 
+function normalizeForecast(raw: any): Forecast {
+  if (!raw) return raw;
+  const conf = raw.confidence;
+  const numericScore =
+    typeof conf === "number"
+      ? conf
+      : typeof conf?.score === "number"
+        ? conf.score
+        : typeof raw.confidenceScore === "number"
+          ? raw.confidenceScore
+          : undefined;
+
+  return {
+    ...raw,
+    confidence: numericScore,
+    confidenceScore: numericScore,
+    confidenceDetails: typeof conf === "object" && conf !== null ? conf : undefined,
+  };
+}
+
 export const api: HarvestWindowApi = {
   async loadSnapshot(userEmailOrId?: string | null) {
     const isDemo = !userEmailOrId || userEmailOrId === DEMO_CREDENTIALS.email;
@@ -232,7 +252,7 @@ export const api: HarvestWindowApi = {
     if (API_CONFIG.mode === "live") {
       try {
         const liveFarms = await this.listFarms();
-        let liveCrops: Crop[] = [];
+        let liveCrops: Crop[] | null = null;
         try {
           liveCrops = await this.listCrops();
         } catch (cropErr) {
@@ -242,16 +262,26 @@ export const api: HarvestWindowApi = {
         const farmsToUse = Array.isArray(liveFarms) ? liveFarms : baseSnapshot.farms;
         const farmIdSet = new Set(farmsToUse.map((f) => f.id));
         const cropsToUse =
-          Array.isArray(liveCrops) && liveCrops.length > 0
+          liveCrops !== null
             ? liveCrops
             : isDemo
               ? baseSnapshot.crops
               : baseSnapshot.crops.filter((c) => farmIdSet.has(c.farmId));
 
+        const validDefaultFarm = farmsToUse.some(
+          (f) => f.id === baseSnapshot.settings?.defaultFarmId
+        )
+          ? baseSnapshot.settings.defaultFarmId
+          : (farmsToUse[0]?.id ?? null);
+
         return {
           ...baseSnapshot,
           farms: farmsToUse,
           crops: cropsToUse,
+          settings: {
+            ...baseSnapshot.settings,
+            defaultFarmId: validDefaultFarm,
+          },
         };
       } catch (err) {
         console.warn(
@@ -663,7 +693,7 @@ export const api: HarvestWindowApi = {
           `/forecasts${qs}`
         );
         if (Array.isArray(res?.data?.forecasts)) {
-          return res.data.forecasts;
+          return res.data.forecasts.map(normalizeForecast);
         }
       } catch (err) {
         console.warn("[HarvestWindow API] Live listForecasts failed, using fallback:", err);
@@ -689,7 +719,7 @@ export const api: HarvestWindowApi = {
     if (API_CONFIG.mode === "live") {
       try {
         const res = await apiRequest<{ success: boolean; data: Forecast }>(`/forecasts/${cropId}`);
-        if (res?.data) return res.data;
+        if (res?.data) return normalizeForecast(res.data);
       } catch (err) {
         console.warn(`[HarvestWindow API] Live getForecast failed for ${cropId}:`, err);
       }
@@ -715,7 +745,14 @@ export const api: HarvestWindowApi = {
           method: "POST",
           body: JSON.stringify(scope || {}),
         });
-        if (res?.data) return res.data;
+        if (res?.data) {
+          return {
+            ...res.data,
+            forecasts: Array.isArray(res.data.forecasts)
+              ? res.data.forecasts.map(normalizeForecast)
+              : [],
+          };
+        }
       } catch (err) {
         console.warn("[HarvestWindow API] Live refreshForecasts failed, using client recalculation:", err);
       }

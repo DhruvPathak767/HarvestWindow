@@ -85,6 +85,8 @@ export interface Forecast {
   readinessStatus: ReadinessStatus;
   /** Optional by contract: completeness of inputs, not measured model accuracy. */
   confidence?: number;
+  confidenceScore?: number;
+  confidenceDetails?: { score: number; level: string; interpretation?: string };
   contributingFactors: ContributingFactor[];
   stagePlan: GrowthStagePoint[];
   seasonProgress: number;

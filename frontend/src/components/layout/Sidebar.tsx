@@ -58,7 +58,7 @@ export function Sidebar({
   const farmLabel =
     selectedFarmId === ALL_FARMS
       ? "All farms"
-      : (selectedFarm?.name ?? "Select a farm");
+      : (selectedFarm?.name ?? (farms.length > 0 ? farms[0].name : "Select a farm"));
 
   const go = (path: string) => {
     navigate(path);
