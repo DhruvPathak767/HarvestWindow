@@ -3,6 +3,7 @@ import { AppError } from "../../middleware/errorHandler.js";
 import { getWeatherForFarm } from "../weather/weather.service.js";
 import { buildWeatherContext } from "./weatherContext.js";
 import { predictHarvestWindow } from "./predictionEngine.js";
+import { logActivity } from "../activity/activity.service.js";
 
 /**
  * Helper to retrieve weather contexts for unique farms efficiently in batch.
@@ -309,6 +310,18 @@ export async function refreshForecasts(userId, scope = {}) {
       weatherContext: crop.farmId ? weatherContexts.get(crop.farmId) : null,
     })
   );
+
+  if (refreshed.length > 0) {
+    await logActivity({
+      userId,
+      type: "forecast-refreshed",
+      title: "Harvest forecasts refreshed",
+      message: `Refreshed harvest predictions for ${refreshed.length} crop${refreshed.length === 1 ? "" : "s"}`,
+      entityType: "forecast",
+      farmId: scope.farmId || undefined,
+      cropId: scope.cropId || undefined,
+    }).catch(() => null);
+  }
 
   return {
     processed: refreshed.length,

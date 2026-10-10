@@ -1,4 +1,5 @@
 import prisma from "../../config/prisma.js";
+import { logActivity } from "../activity/activity.service.js";
 
 /**
  * Normalizes a Prisma Farm model into the API contract expected by the frontend.
@@ -139,7 +140,19 @@ export async function createFarm(userId, input) {
     },
   });
 
-  return formatFarm(created);
+  const formatted = formatFarm(created);
+
+  await logActivity({
+    userId,
+    type: "farm-added",
+    title: `Farm added: ${created.name}`,
+    message: `${created.name} added (${created.district}, ${created.state})`,
+    entityType: "farm",
+    entityId: created.id,
+    farmId: created.id,
+  }).catch(() => null);
+
+  return formatted;
 }
 
 /**
@@ -198,7 +211,19 @@ export async function updateFarm(userId, farmId, input) {
     data: updateData,
   });
 
-  return formatFarm(updated);
+  const formatted = formatFarm(updated);
+
+  await logActivity({
+    userId,
+    type: "farm-updated",
+    title: `Farm updated: ${updated.name}`,
+    message: `Updated farm details for ${updated.name}`,
+    entityType: "farm",
+    entityId: updated.id,
+    farmId: updated.id,
+  }).catch(() => null);
+
+  return formatted;
 }
 
 /**
@@ -222,6 +247,15 @@ export async function deleteFarm(userId, farmId) {
   if (!existing) {
     return null;
   }
+
+  await logActivity({
+    userId,
+    type: "farm-deleted",
+    title: `Farm removed: ${existing.name}`,
+    message: `Removed farm record '${existing.name}'`,
+    entityType: "farm",
+    entityId: existing.id,
+  }).catch(() => null);
 
   await prisma.farm.delete({
     where: { id: farmId },

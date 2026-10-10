@@ -15,10 +15,27 @@ const PRIORITY_RANK: Record<Priority, number> = { high: 0, medium: 1, low: 2 };
 
 export default function RecommendationsPage() {
   const navigate = useNavigate();
-  const { recommendations, crops, farms, setRecommendationStatus, selectedFarmId } = useStore();
+  const {
+    recommendations,
+    crops,
+    farms,
+    setRecommendationStatus,
+    refreshRecommendations,
+    selectedFarmId,
+  } = useStore();
   const [tab, setTab] = useState<StatusTab>("open");
   const [priority, setPriority] = useState<Priority | "all">("all");
   const [cropFilter, setCropFilter] = useState<string>("all");
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refreshRecommendations(selectedFarmId === ALL_FARMS ? undefined : selectedFarmId);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const scoped = useMemo(
     () =>
@@ -71,8 +88,16 @@ export default function RecommendationsPage() {
         ]}
         actions={
           <>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={handleRefresh}
+              disabled={refreshing}
+            >
+              <RotateCcw className={cn("h-4 w-4", refreshing && "animate-spin")} aria-hidden />
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </Button>
             <Button size="sm" variant="secondary" onClick={clearFilters}>
-              <RotateCcw className="h-4 w-4" aria-hidden />
               Reset filters
             </Button>
             <Button size="sm" onClick={() => navigate("/app")}>

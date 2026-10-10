@@ -123,6 +123,7 @@ interface StoreValue {
   removeCrop: (cropId: string) => Promise<void>;
   fetchCrop: (cropId: string) => Promise<Crop | null>;
   refreshCrops: (farmId?: string) => Promise<Crop[]>;
+  refreshRecommendations: (farmId?: string) => Promise<void>;
   setRecommendationStatus: (id: string, status: RecommendationStatus) => Promise<void>;
   updateSettings: (patch: Partial<AppSettings>) => Promise<void>;
   updateProfile: (patch: Partial<UserProfile>) => Promise<void>;
@@ -154,6 +155,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedFarmId, setSelectedFarmId] = useState<FarmSelection>(ALL_FARMS);
   const [readNotificationIds, setReadNotificationIds] = useState<string[]>([]);
+  const [serverNotifications, setServerNotifications] = useState<AppNotification[]>([]);
+  const [serverUnreadCount, setServerUnreadCount] = useState<number | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [serverForecasts, setServerForecasts] = useState<Record<string, Forecast>>({});
   const [refreshingForecasts, setRefreshingForecasts] = useState(false);
@@ -233,6 +236,36 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         } catch (settingsErr) {
           console.warn("[HarvestWindow API] Unable to fetch live settings during snapshot load:", settingsErr);
         }
+
+        // Pull live persistent activities and notifications for authenticated user
+        if (authUser) {
+          try {
+            const [liveAct, liveNotifs, unread] = await Promise.all([
+              api.listActivities({ limit: 40 }),
+              api.listNotifications({ limit: 20 }),
+              api.getUnreadNotificationCount(),
+            ]);
+            if (Array.isArray(liveAct) && liveAct.length > 0) {
+              data.activity = liveAct;
+            }
+            if (Array.isArray(liveNotifs) && liveNotifs.length > 0) {
+              setServerNotifications(
+                liveNotifs.map((n) => ({
+                  id: n.id,
+                  title: n.title,
+                  body: n.body || n.message || "",
+                  at: n.at,
+                  kind: (n.kind as any) || "activity",
+                  farmId: n.farmId,
+                  cropId: n.cropId,
+                }))
+              );
+            }
+            setServerUnreadCount(unread);
+          } catch (actErr) {
+            console.warn("[HarvestWindow API] Unable to fetch live activities/notifications:", actErr);
+          }
+        }
       }
 
       setReady(true);
@@ -288,6 +321,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   }, [intelligence.weather, liveWeather]);
 
   const notifications = useMemo<AppNotification[]>(() => {
+    if (serverNotifications.length > 0) {
+      return serverNotifications;
+    }
+
     const out: AppNotification[] = [];
 
     for (const farm of snapshot.farms) {
@@ -320,12 +357,14 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     return out.sort(
       (a, b) => new Date(b.at).getTime() - new Date(a.at).getTime()
     ).slice(0, 8);
-  }, [snapshot.farms, snapshot.activity, intelligence.weather]);
+  }, [serverNotifications, snapshot.farms, snapshot.activity, mergedWeather]);
 
-  const unreadCount = useMemo(
-    () => notifications.filter((n) => !readNotificationIds.includes(n.id)).length,
-    [notifications, readNotificationIds]
-  );
+  const unreadCount = useMemo(() => {
+    if (serverUnreadCount !== null) {
+      return serverUnreadCount;
+    }
+    return notifications.filter((n) => !readNotificationIds.includes(n.id)).length;
+  }, [serverUnreadCount, notifications, readNotificationIds]);
 
   const allRecommendations = useMemo<Recommendation[]>(() => {
     const existingMap = new Map<string, Recommendation>();
@@ -438,10 +477,71 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           ? userSnapshot.crops
           : userSnapshot.crops.filter((c) => farmIdSet.has(c.farmId));
 
+        let liveRecs: Recommendation[] = [];
+        try {
+          const recRes = await api.listRecommendations({ limit: 100 });
+          if (recRes && Array.isArray(recRes.items)) {
+            liveRecs = recRes.items;
+          }
+          if (!isDemo && validCrops.length > 0 && liveRecs.length === 0) {
+            try {
+              await api.refreshRecommendations();
+              const refreshed = await api.listRecommendations({ limit: 100 });
+              if (refreshed && Array.isArray(refreshed.items)) {
+                liveRecs = refreshed.items;
+              }
+            } catch {
+              /* ignore auto-refresh error */
+            }
+          }
+        } catch (recErr) {
+          console.warn("[AppStore] Could not fetch live recommendations on sign-in:", recErr);
+        }
+
+        const validRecs =
+          Array.isArray(liveRecs) && liveRecs.length > 0
+            ? liveRecs
+            : isDemo
+              ? userSnapshot.recommendations
+              : userSnapshot.recommendations.filter((r) => farmIdSet.has(r.farmId));
+
+        let liveAct: ActivityEvent[] = [];
+        if (!isDemo && API_CONFIG.mode === "live") {
+          try {
+            void api.syncAlerts().catch(() => {});
+            const [acts, notifs, unread] = await Promise.all([
+              api.listActivities({ limit: 40 }),
+              api.listNotifications({ limit: 20 }),
+              api.getUnreadNotificationCount(),
+            ]);
+            if (Array.isArray(acts) && acts.length > 0) {
+              liveAct = acts;
+            }
+            if (Array.isArray(notifs) && notifs.length > 0) {
+              setServerNotifications(
+                notifs.map((n) => ({
+                  id: n.id,
+                  title: n.title,
+                  body: n.body || n.message || "",
+                  at: n.at,
+                  kind: (n.kind as any) || "activity",
+                  farmId: n.farmId,
+                  cropId: n.cropId,
+                }))
+              );
+            }
+            setServerUnreadCount(unread);
+          } catch (actErr) {
+            console.warn("[AppStore] Could not fetch live activities/notifications on sign-in:", actErr);
+          }
+        }
+
         const updatedSnapshot: PersistedSnapshot = {
           ...userSnapshot,
           farms: liveFarms,
           crops: validCrops,
+          recommendations: validRecs,
+          activity: liveAct.length > 0 ? liveAct : userSnapshot.activity,
           signedIn: true,
           user: {
             fullName: result.user.name,
@@ -562,6 +662,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(() => {
     void authClient.logout();
     setAuthToken(null);
+    setServerNotifications([]);
+    setServerUnreadCount(null);
     const loggedOutSnap = buildSeedSnapshot();
     loggedOutSnap.signedIn = false;
     setSnapshot(loggedOutSnap);
@@ -876,9 +978,49 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     [patch]
   );
 
+  const refreshRecommendations = useCallback<StoreValue["refreshRecommendations"]>(
+    async (farmId) => {
+      try {
+        await api.refreshRecommendations(farmId);
+        const res = await api.listRecommendations(farmId ? { farmId, limit: 100 } : { limit: 100 });
+        if (res && Array.isArray(res.items)) {
+          patch((prev) => ({
+            ...prev,
+            recommendations: res.items,
+            activity: [
+              {
+                id: newActivityId(),
+                type: "recommendation-generated" as const,
+                message: `Refreshed guidance: ${res.items.filter((r) => r.status === "open").length} open actions available`,
+                at: new Date().toISOString(),
+                farmId,
+              },
+              ...prev.activity,
+            ].slice(0, 40),
+          }));
+          toast({
+            tone: "success",
+            title: "Recommendations updated",
+            description: "Fresh guidance calculated based on current crops, weather, and farm data.",
+          });
+        }
+      } catch (err) {
+        console.error("[AppStore] Failed to refresh recommendations:", err);
+        toast({
+          tone: "caution",
+          title: "Refresh failed",
+          description: "Could not generate fresh recommendations from the server.",
+        });
+      }
+    },
+    [patch, toast]
+  );
+
   const setRecommendationStatus = useCallback<StoreValue["setRecommendationStatus"]>(
     async (id, status) => {
       const rec = allRecommendations.find((r) => r.id === id);
+      const previousStatus = rec?.status;
+
       patch((prev) => {
         const found = allRecommendations.find((r) => r.id === id);
         const updated = found ? { ...found, status } : ({ id, status } as any);
@@ -904,17 +1046,34 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
               : prev.activity,
         };
       });
-      await api.setRecommendationStatus(id, status);
-      toast({
-        tone: status === "completed" ? "success" : "info",
-        title:
-          status === "completed"
-            ? "Marked as completed"
-            : status === "dismissed"
-              ? "Recommendation dismissed"
-              : "Recommendation reopened",
-        description: rec?.title,
-      });
+
+      try {
+        await api.setRecommendationStatus(id, status);
+        toast({
+          tone: status === "completed" ? "success" : "info",
+          title:
+            status === "completed"
+              ? "Marked as completed"
+              : status === "dismissed"
+                ? "Recommendation dismissed"
+                : "Recommendation reopened",
+          description: rec?.title,
+        });
+      } catch (err) {
+        if (previousStatus) {
+          patch((prev) => ({
+            ...prev,
+            recommendations: prev.recommendations.map((r) =>
+              r.id === id ? { ...r, status: previousStatus } : r
+            ),
+          }));
+        }
+        toast({
+          tone: "caution",
+          title: "Status update failed",
+          description: "Could not update recommendation status on the server.",
+        });
+      }
     },
     [patch, allRecommendations, toast]
   );
@@ -1048,6 +1207,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
   const markNotificationsRead = useCallback(() => {
     setReadNotificationIds(notifications.map((n) => n.id));
+    setServerUnreadCount(0);
+    if (API_CONFIG.mode === "live") {
+      void api.markAllNotificationsRead().catch(() => {});
+    }
   }, [notifications]);
 
   const value = useMemo<StoreValue>(
@@ -1088,6 +1251,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       removeCrop,
       fetchCrop,
       refreshCrops,
+      refreshRecommendations,
       setRecommendationStatus,
       updateSettings,
       updateProfile,
@@ -1126,6 +1290,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       removeCrop,
       fetchCrop,
       refreshCrops,
+      refreshRecommendations,
       setRecommendationStatus,
       updateSettings,
       refreshingForecasts,
