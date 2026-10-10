@@ -10,6 +10,8 @@ import {
   EyeOff,
   KeyRound,
   Mail,
+  Sprout,
+  Store,
   TriangleAlert,
   UserRound,
 } from "lucide-react";
@@ -19,9 +21,11 @@ import { Button } from "@/components/common/ui";
 import { CheckboxField, TextField } from "@/components/common/fields";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { useStore } from "@/store/AppStore";
+import { cn } from "@/utils/cn";
 
 const schema = z
   .object({
+    role: z.enum(["FARMER", "SELLER"]),
     fullName: z.string().trim().min(2, "Enter your full name").max(60),
     email: z.string().trim().min(1, "Enter your email").email("That does not look like a valid email"),
     password: z
@@ -44,6 +48,7 @@ export default function SignUp() {
   const { signUp } = useStore();
   const { toast } = useToast();
   const [showPassword, setShowPassword] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const {
@@ -55,6 +60,7 @@ export default function SignUp() {
   } = useForm<FormValues>({
     resolver: zodResolver(schema) as never,
     defaultValues: {
+      role: "FARMER",
       fullName: "",
       email: "",
       password: "",
@@ -63,6 +69,7 @@ export default function SignUp() {
     },
   });
 
+  const selectedRole = watch("role") ?? "FARMER";
   const terms = watch("terms");
   const passwordValue = watch("password") ?? "";
 
@@ -77,13 +84,25 @@ export default function SignUp() {
 
   const onSubmit = async (values: FormValues) => {
     setSubmitting(true);
-    await signUp({ fullName: values.fullName, email: values.email });
+    setFormError(null);
+    const result = await signUp({
+      fullName: values.fullName,
+      email: values.email,
+      password: values.password,
+      role: values.role,
+    });
     setSubmitting(false);
+    if (!result.ok) {
+      setFormError(result.message ?? "Registration failed.");
+      return;
+    }
     toast({
       tone: "success",
-      title: "Demo session created",
+      title: "Account created",
       description:
-        "No account was sent to a server — this frontend stores your profile locally.",
+        values.role === "SELLER"
+          ? "Welcome to HarvestWindow. Your seller workspace is ready."
+          : "Welcome to HarvestWindow. Your farmer workspace is ready.",
     });
     navigate("/app", { replace: true });
   };
@@ -91,7 +110,7 @@ export default function SignUp() {
   return (
     <AuthLayout
       title="Create your account"
-      subtitle="Set up a workspace for your farms and crops. In this demo build the profile is stored in your browser only."
+      subtitle="Set up a workspace for your farms and crops with authentic harvest predictions."
       image={IMAGES.authSplitAlt}
       imageAlt="Two farmers harvesting in a lush green rice field"
       footer={
@@ -104,6 +123,96 @@ export default function SignUp() {
       }
     >
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
+        <AnimatePresence>
+          {formError && (
+            <motion.div
+              initial={{ opacity: 0, y: -8, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: "auto" }}
+              exit={{ opacity: 0, y: -8, height: 0 }}
+              transition={{ duration: 0.22 }}
+              role="alert"
+              className="flex items-start gap-2.5 overflow-hidden rounded-md border border-danger/35 bg-[#fdf1ee] px-3.5 py-3"
+            >
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-danger" aria-hidden />
+              <p className="text-[12.5px] leading-relaxed text-[#8d3a26]">{formError}</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* User Role Selection */}
+        <div className="flex flex-col gap-1.5">
+          <label className="font-display text-[12.5px] font-semibold tracking-[-0.005em] text-forest-deep">
+            I am joining as a <span className="ml-0.5 text-caution">*</span>
+          </label>
+          <div className="grid grid-cols-2 gap-2.5">
+            <button
+              type="button"
+              onClick={() => setValue("role", "FARMER")}
+              className={cn(
+                "group relative flex flex-col items-start gap-1 rounded-md border p-3 text-left transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-forest/30",
+                selectedRole === "FARMER"
+                  ? "border-forest bg-[#eef4ea] shadow-sm ring-1 ring-forest/20"
+                  : "border-line bg-white hover:border-forest/50 hover:bg-soft/40"
+              )}
+            >
+              <div className="flex w-full items-center justify-between">
+                <span
+                  className={cn(
+                    "grid h-7 w-7 place-items-center rounded-full transition-colors",
+                    selectedRole === "FARMER"
+                      ? "bg-forest text-cream"
+                      : "bg-soft text-muted group-hover:text-forest-deep"
+                  )}
+                >
+                  <Sprout className="h-4 w-4" aria-hidden />
+                </span>
+                {selectedRole === "FARMER" && (
+                  <span className="h-2 w-2 rounded-full bg-forest" />
+                )}
+              </div>
+              <p className="mt-1 font-display text-[13px] font-bold text-forest-deep">
+                Farmer / Producer
+              </p>
+              <p className="text-[11px] leading-tight text-muted">
+                Manage land, crops & harvest forecasts
+              </p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setValue("role", "SELLER")}
+              className={cn(
+                "group relative flex flex-col items-start gap-1 rounded-md border p-3 text-left transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-forest/30",
+                selectedRole === "SELLER"
+                  ? "border-forest bg-[#eef4ea] shadow-sm ring-1 ring-forest/20"
+                  : "border-line bg-white hover:border-forest/50 hover:bg-soft/40"
+              )}
+            >
+              <div className="flex w-full items-center justify-between">
+                <span
+                  className={cn(
+                    "grid h-7 w-7 place-items-center rounded-full transition-colors",
+                    selectedRole === "SELLER"
+                      ? "bg-forest text-cream"
+                      : "bg-soft text-muted group-hover:text-forest-deep"
+                  )}
+                >
+                  <Store className="h-4 w-4" aria-hidden />
+                </span>
+                {selectedRole === "SELLER" && (
+                  <span className="h-2 w-2 rounded-full bg-forest" />
+                )}
+              </div>
+              <p className="mt-1 font-display text-[13px] font-bold text-forest-deep">
+                Seller / Trader
+              </p>
+              <p className="text-[11px] leading-tight text-muted">
+                Track harvest supply & procurement
+              </p>
+            </button>
+          </div>
+        </div>
+
         <TextField
           label="Full name"
           required
@@ -215,7 +324,7 @@ export default function SignUp() {
         />
 
         <Button type="submit" size="lg" loading={submitting} className="mt-1 w-full">
-          Create demo account
+          Create account
         </Button>
       </form>
     </AuthLayout>

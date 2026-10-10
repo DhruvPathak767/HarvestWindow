@@ -57,7 +57,7 @@ export default function SignIn() {
     toast({
       tone: "success",
       title: "Welcome back",
-      description: "Demo session started — the sample farms are already estimated.",
+      description: "Signed in successfully with MySQL backend.",
     });
     navigate("/app", { replace: true });
   };

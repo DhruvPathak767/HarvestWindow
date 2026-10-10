@@ -30,6 +30,7 @@ import { localStore, type PersistedSnapshot } from "@/services/storage/localStor
 import { DEFAULT_SETTINGS, DEMO_CREDENTIALS, DEMO_USER } from "@/data/mock/seed";
 import { setLocale } from "@/utils/date";
 import { useToast } from "@/components/feedback/ToastProvider";
+import { authClient } from "@/services/api/authClient";
 
 export const ALL_FARMS = "all" as const;
 export type FarmSelection = string | typeof ALL_FARMS;
@@ -85,6 +86,8 @@ interface StoreValue {
   signUp: (input: {
     fullName: string;
     email: string;
+    password?: string;
+    role?: "FARMER" | "SELLER";
   }) => Promise<{ ok: boolean; message?: string }>;
   signOut: () => void;
 
@@ -129,13 +132,33 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     setLoadError(null);
     try {
       const data = await api.loadSnapshot();
+
+      // Restore authentication from server state rather than trusting local storage
+      try {
+        const authResult = await authClient.getMe();
+        if (authResult?.user) {
+          data.signedIn = true;
+          data.user = {
+            fullName: authResult.user.name,
+            email: authResult.user.email,
+            role: authResult.user.role,
+            organisation: data.user?.organisation || "HarvestWindow Farm",
+          };
+        } else {
+          data.signedIn = false;
+        }
+      } catch {
+        // No active or valid session exists on server
+        data.signedIn = false;
+      }
+
       setSnapshot(data);
       hydrated.current = true;
       setSelectedFarmId(data.settings.defaultFarmId ?? data.farms[0]?.id ?? ALL_FARMS);
       setReady(true);
     } catch {
       setLoadError(
-        "We could not load the demo dataset. Your browser storage may be blocked."
+        "We could not load the workspace data. Your browser storage may be blocked."
       );
       setReady(true);
     }
@@ -217,17 +240,29 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback<StoreValue["signIn"]>(
     async (email, password) => {
-      await new Promise((r) => setTimeout(r, 780));
-      const normalized = email.trim().toLowerCase();
-      if (normalized !== DEMO_CREDENTIALS.email || password !== DEMO_CREDENTIALS.password) {
+      try {
+        const result = await authClient.login({ email, password });
+        patch((prev) => ({
+          ...prev,
+          signedIn: true,
+          user: {
+            fullName: result.user.name,
+            email: result.user.email,
+            role: result.user.role,
+            organisation: prev.user?.organisation || "HarvestWindow Farm",
+          },
+        }));
+        return { ok: true };
+      } catch (err: unknown) {
+        const message =
+          err instanceof Error
+            ? err.message
+            : "Sign in failed. Please check your credentials.";
         return {
           ok: false,
-          message:
-            "Those credentials do not match the demo account. Use ananya@harvestwindow.demo / harvest-demo.",
+          message,
         };
       }
-      patch((prev) => ({ ...prev, signedIn: true, user: DEMO_USER }));
-      return { ok: true };
     },
     [patch]
   );
@@ -237,24 +272,48 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   }, [patch]);
 
   const signUp = useCallback<StoreValue["signUp"]>(
-    async ({ fullName, email }) => {
-      await new Promise((r) => setTimeout(r, 820));
-      patch((prev) => ({
-        ...prev,
-        signedIn: true,
-        user: {
-          fullName: fullName.trim(),
-          email: email.trim().toLowerCase(),
-          role: "Farm manager",
-          organisation: "Independent",
-        },
-      }));
-      return { ok: true };
+    async ({ fullName, email, password, role = "FARMER" }) => {
+      try {
+        if (!password) {
+          return { ok: false, message: "Password is required." };
+        }
+        await authClient.register({
+          name: fullName,
+          email,
+          password,
+          role,
+        });
+
+        // Automatically authenticate using the exact same secure login verification
+        const result = await authClient.login({ email, password });
+
+        patch((prev) => ({
+          ...prev,
+          signedIn: true,
+          user: {
+            fullName: result.user.name,
+            email: result.user.email,
+            role: result.user.role,
+            organisation: role === "SELLER" ? "Merchant / Trading" : "Independent Producer",
+          },
+        }));
+        return { ok: true };
+      } catch (err: unknown) {
+        const message =
+          err instanceof Error
+            ? err.message
+            : "Registration failed. Please check your inputs.";
+        return {
+          ok: false,
+          message,
+        };
+      }
     },
     [patch]
   );
 
   const signOut = useCallback(() => {
+    void authClient.logout();
     patch((prev) => ({ ...prev, signedIn: false }));
     setShowOnboarding(false);
   }, [patch]);

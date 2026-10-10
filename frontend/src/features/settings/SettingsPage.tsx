@@ -53,12 +53,8 @@ export default function SettingsPage() {
       toast({ tone: "error", title: "Enter a name", description: "At least two characters." });
       return;
     }
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) {
-      toast({ tone: "error", title: "Enter a valid email", description: email });
-      return;
-    }
     setSavingProfile(true);
-    await updateProfile({ fullName: name.trim(), email: email.trim(), role: role.trim() || user.role });
+    await updateProfile({ fullName: name.trim() });
     setSavingProfile(false);
   };
 
@@ -135,9 +131,15 @@ export default function SettingsPage() {
               label="Email address"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              disabled
+              hint="Your verified HarvestWindow account email."
             />
-            <TextField label="Role" value={role} onChange={(e) => setRole(e.target.value)} />
+            <TextField
+              label="Assigned Role"
+              value={user.role}
+              disabled
+              hint="Role permissions are managed administratively."
+            />
 
             <div className="flex justify-end">
               <Button size="sm" onClick={saveProfile} loading={savingProfile}>
