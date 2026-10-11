@@ -19,6 +19,7 @@ import notificationRoutes from "./modules/notifications/notifications.routes.js"
 import agricultureRoutes from "./modules/agriculture/agriculture.routes.js";
 import harvestPredictionRoutes from "./modules/forecasts/harvestPrediction.routes.js";
 import yieldRoutes from "./modules/yield/yield.routes.js";
+import cropHealthRoutes from "./modules/cropHealth/cropHealth.routes.js";
 
 export const app = express();
 
@@ -62,6 +63,7 @@ app.use(
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 app.use(cookieParser());
+app.use("/uploads", express.static("uploads"));
 
 // Global API Rate Limiting
 app.use("/api", apiLimiter);
@@ -122,6 +124,11 @@ app.use("/api/harvest-predictions", harvestPredictionRoutes);
 
 app.use("/api/v1/yield", yieldRoutes);
 app.use("/api/yield", yieldRoutes);
+
+app.use("/api/v1/crop-health", cropHealthRoutes);
+app.use("/api/crop-health", cropHealthRoutes);
+app.use("/api/v1/ai/crop-health", cropHealthRoutes);
+app.use("/api/ai/crop-health", cropHealthRoutes);
 
 // 404 Handler & Centralized Error Handler
 app.use(notFoundHandler);

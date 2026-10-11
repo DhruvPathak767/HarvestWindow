@@ -1,0 +1,39 @@
+/**
+ * HarvestWindow Phase AI-6: Crop Disease and Health Detection Constants
+ */
+
+export const CROP_HEALTH_CONSTANTS = {
+  ALLOWED_MIME_TYPES: [
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/webp",
+    "image/bmp",
+  ],
+  MAX_FILE_SIZE_BYTES: 10 * 1024 * 1024, // 10 MB
+  DEFAULT_MODEL_VERSION: "1.0.0",
+
+  STATUSES: {
+    HEALTHY: "HEALTHY",
+    DISEASED: "DISEASED",
+    UNFAMILIAR: "UNFAMILIAR",
+    INCONCLUSIVE: "INCONCLUSIVE",
+  },
+
+  CONFIDENCE_LEVELS: {
+    HIGH: "HIGH_CONFIDENCE",
+    MODERATE: "MODERATE_CONFIDENCE",
+    LOW: "LOW_CONFIDENCE",
+    INCONCLUSIVE: "INCONCLUSIVE",
+  },
+
+  CATEGORIES: {
+    HEALTHY: "HEALTHY",
+    FUNGAL_DISEASE: "FUNGAL_DISEASE",
+    BACTERIAL_DISEASE: "BACTERIAL_DISEASE",
+    VIRAL_DISEASE: "VIRAL_DISEASE",
+    PEST_DAMAGE: "PEST_DAMAGE",
+    NUTRIENT_STRESS: "NUTRIENT_OR_ENVIRONMENTAL_STRESS",
+    UNKNOWN: "UNKNOWN_OR_UNSUPPORTED",
+  },
+};

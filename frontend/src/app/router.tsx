@@ -13,6 +13,7 @@ const DashboardPage = lazy(() => import("@/features/dashboard/DashboardPage"));
 const FarmsPage = lazy(() => import("@/features/farms/FarmsPage"));
 const FarmDetailPage = lazy(() => import("@/features/farms/FarmDetailPage"));
 const CropDetailPage = lazy(() => import("@/features/crops/CropDetailPage"));
+const CropHealthPage = lazy(() => import("@/features/cropHealth/CropHealthPage"));
 const ForecastPage = lazy(() => import("@/features/forecasts/ForecastPage"));
 const WeatherPage = lazy(() => import("@/features/weather/WeatherPage"));
 const RecommendationsPage = lazy(
@@ -71,6 +72,7 @@ export function AppRoutes() {
               <Route path="farms" element={<FarmsPage />} />
               <Route path="farms/:farmId" element={<FarmDetailPage />} />
               <Route path="crops/:cropId" element={<CropDetailPage />} />
+              <Route path="crop-health" element={<CropHealthPage />} />
               <Route path="forecast" element={<ForecastPage />} />
               <Route path="weather" element={<WeatherPage />} />
               <Route path="recommendations" element={<RecommendationsPage />} />

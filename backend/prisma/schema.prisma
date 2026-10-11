@@ -40,6 +40,7 @@ model User {
   weatherAssessments WeatherAssessment[]
   yieldPredictions   YieldPrediction[]
   actualProductions  ActualProduction[]
+  cropHealthAnalyses CropHealthAnalysis[]
 
   @@index([role])
   @@map("users")
@@ -91,6 +92,7 @@ model Farm {
   weatherAssessments     WeatherAssessment[]
   yieldPredictions       YieldPrediction[]
   actualProductions      ActualProduction[]
+  cropHealthAnalyses     CropHealthAnalysis[]
 
   @@index([userId])
   @@map("farms")
@@ -143,6 +145,7 @@ model Crop {
   weatherAssessments  WeatherAssessment[]
   yieldPredictions    YieldPrediction[]
   actualProductions   ActualProduction[]
+  cropHealthAnalyses  CropHealthAnalysis[]
 
   @@index([farmId])
   @@index([cropName])
@@ -650,6 +653,43 @@ model ActualProduction {
   @@index([farmId])
   @@index([cropId, harvestDate])
   @@map("actual_productions")
+}
+
+// ==========================================
+// Phase AI-6: Crop Disease and Health Detection Models
+// ==========================================
+model CropHealthAnalysis {
+  id                  String    @id @default(cuid())
+  userId              String    @db.VarChar(191)
+  farmId              String?   @db.VarChar(191)
+  cropId              String?   @db.VarChar(191)
+  imageUrl            String?   @db.VarChar(500)
+  imageName           String?   @db.VarChar(255)
+  predictedClassId    String    @db.VarChar(100)
+  predictedClassName  String    @db.VarChar(150)
+  cropName            String    @db.VarChar(100)
+  conditionCategory   String    @db.VarChar(50)
+  confidence          Decimal   @db.Decimal(5, 2)
+  confidenceLevel     String    @db.VarChar(30)
+  status              String    @db.VarChar(30)
+  symptomsJson        String?   @db.Text
+  recommendationsJson String?   @db.Text
+  alternativesJson    String?   @db.Text
+  qualityWarningsJson String?   @db.Text
+  expertAdvice        String?   @db.Text
+  modelVersion        String    @default("1.0.0") @db.VarChar(60)
+  analyzedAt          DateTime  @default(now())
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  farm                Farm?     @relation(fields: [farmId], references: [id], onDelete: SetNull)
+  crop                Crop?     @relation(fields: [cropId], references: [id], onDelete: SetNull)
+
+  @@index([userId, analyzedAt])
+  @@index([cropId])
+  @@index([farmId])
+  @@map("crop_health_analyses")
 }
 
 

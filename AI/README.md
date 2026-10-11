@@ -371,13 +371,113 @@ python -m AI.yield_forecasting.data_validation
 # 2. Model Training & Evaluation
 python -m AI.yield_forecasting.train
 
-# 3. AI Pytest Suite (44 tests)
+# 3. AI Pytest Suite (59 tests)
 python -m pytest AI/tests/
 
-# 4. Node.js Backend Test Suite (222 tests across 44 suites)
+# 4. Node.js Backend Test Suite (231 tests across 47 suites)
 cd backend && npm test
 
 # 5. Frontend Production Bundle Build
 cd frontend && npm run build
 ```
+
+---
+
+## 11. Phase AI-6 — Crop Disease and Health Detection Engine
+
+### 11.1 Overview & Architecture
+Phase AI-6 introduces computer-vision crop pathology screening and leaf health detection to HarvestWindow. Authenticated farmers upload leaf photographs to receive:
+1. Most likely condition across 25 agricultural classes for staple Indian crops (Potato, Tomato, Corn, Grape, Apple).
+2. Honest confidence score (`HIGH_CONFIDENCE`, `MODERATE_CONFIDENCE`, `LOW_CONFIDENCE`, `INCONCLUSIVE`).
+3. Diagnostic status categorization: `HEALTHY`, `DISEASED`, `UNFAMILIAR`, or `INCONCLUSIVE`.
+4. Top-3 alternative classifications with likelihood distribution.
+5. Image quality checks (file size $\le 10$ MB, MIME types, format, dimensions, blur variance, over/underexposure).
+6. Visible symptom descriptions supported by verified Indian Council of Agricultural Research (ICAR) plant pathology guidelines.
+7. Verified non-chemical preventive measures, cultural hygiene practices, and clear rules on when to consult local Krishi Vigyan Kendra (KVK) or extension specialists (with zero fabricated chemical pesticides or dosages).
+8. Persistent historical scan tracking with strict user and crop ownership isolation.
+
+### 11.2 Dataset Discovery & Audit
+- **Dataset Source**: `Dipra444/plant-leaf-disease-jharkhand` (Hugging Face Hub / PlantVillage derivative).
+- **License**: CC-BY 4.0 / Open Access.
+- **Audited Source Size**: 6,045 images across 25 classes.
+- **Local Balanced Cache**: 300 images (12 images/class balanced split across train/val/test) cached in `AI/datasets/plant_disease_cache/`.
+- **Audit Script**: `AI/crop_health/training/audit_dataset.py` produces `AI/reports/crop_health_dataset_audit.json`.
+- **Data Leakage Safeguards**: Deterministic train/validation/test split (70%/15%/15%) with image hash deduplication.
+
+### 11.3 Model Architecture & Evaluation
+- **Architecture**: `MobileNetV3-Small` with ImageNet transfer learning and a customized linear classifier head.
+- **Pretrained Weights**: `torchvision.models.MobileNet_V3_Small_Weights.DEFAULT`.
+- **Training Pipeline**: `AI/crop_health/training/train.py` trained on CPU in 79s with cross-entropy loss, AdamW optimizer, and learning rate scheduling.
+- **Model Artifact**: Serialized state dict saved at `AI/crop_health/artifacts/crop_health_mobilenet_v3.pth` (6.01 MB).
+- **Evaluation Metrics**:
+  - Test Accuracy: **96.7%** (held-out test set)
+  - Macro Precision: **0.967**
+  - Macro Recall: **0.967**
+  - Macro F1 Score: **0.963**
+  - Average CPU Latency: **6.68 ms** per image inference
+  - Evaluated via `AI/crop_health/training/evaluate.py` $\rightarrow$ `AI/reports/crop_health_model_metrics.json`.
+
+### 11.4 FastAPI Inference Microservice
+- **Entry point**: Mounted in `AI/main.py`.
+- **Endpoints**:
+  - `GET /crop-health/health`: Service health and model status.
+  - `GET /crop-health/ready`: Microservice readiness probe.
+  - `GET /crop-health/model-info`: Supported classes, architecture, latency, and model version metadata.
+  - `POST /crop-health/predict`: Multipart image inference returning prediction, confidence level, alternatives, image warnings, and ICAR advisory.
+- **Pytest Suite**: `AI/tests/test_crop_health.py` (15 tests verifying preprocessing, image quality validation, inference schema, uncertainty policies, and class mapping). Full AI suite: **59 passed**.
+
+### 11.5 Node.js Backend & Database Integration
+- **Prisma Model**: `CropHealthAnalysis` in `backend/prisma/schema.prisma` with relations to `User`, `Farm`, and `Crop`.
+- **Migration**: Applied via `npx prisma db push` and `npx prisma generate`.
+- **Routes Mounted**:
+  - `POST /api/v1/crop-health/analyze` and `POST /api/crops/:cropId/health-analysis`
+  - `GET /api/v1/crop-health/history` and `GET /api/crops/:cropId/health-history`
+  - `GET /api/v1/crop-health/analyses/:analysisId`
+  - `DELETE /api/v1/crop-health/analyses/:analysisId`
+  - `GET /api/v1/crop-health/status`
+- **Security**: JWT authentication, farm/crop ownership verification, multipart file validation, and automatic static file handling for uploads.
+- **Node.js Test Suite**: `backend/tests/crop_health.test.js` (9 comprehensive tests). Full backend suite: **231 passed across 47 suites**.
+
+### 11.6 Frontend Integration
+- **Pages & Routes**:
+  - `/app/crop-health`: Full diagnostic workspace (`CropHealthPage.tsx`) with "Scan Plant Leaf" and "Scan History & Logs" tabs.
+  - Sidebar Navigation: Added "Crop Health" item with `ShieldAlert` icon.
+  - Dashboard Integration: Added `CropHealthWidget` to `DashboardPage.tsx`.
+  - Crop Details: Embedded `CropHealthSection` into `CropDetailPage.tsx` for immediate crop-specific diagnosis.
+- **Interactive Components**:
+  - `ImageUploadZone.tsx`: Drag & drop, camera capture, file preview, validation guards.
+  - `AnalysisResultCard.tsx`: Diagnosis badge, honest confidence pill, top-3 alternatives, visible symptoms, verified ICAR next steps, and KVK contact guidance.
+  - `AnalysisHistoryList.tsx`: Searchable and filterable scan history with modal viewer and delete actions.
+  - `CropHealthWidget.tsx`: Dashboard overview card with recent scan summaries.
+  - `useCropHealth.ts`: Typed React hook for seamless state management.
+
+### 11.7 Exact Run and Test Commands
+```bash
+# 1. Dataset Audit
+python AI/crop_health/training/audit_dataset.py
+
+# 2. Model Training & Evaluation
+python AI/crop_health/training/train.py
+python AI/crop_health/training/evaluate.py
+
+# 3. AI Pytest Suite (59 tests)
+python -m pytest AI/tests/
+
+# 4. Node.js Backend Test Suite (231 tests across 47 suites)
+cd backend && npm test
+
+# 5. Frontend Production Bundle Build
+cd frontend && npm run build
+
+# 6. Run Full System Locally
+# Terminal 1: FastAPI Microservice
+uvicorn AI.main:app --host 0.0.0.0 --port 8000 --reload
+
+# Terminal 2: Node.js Express Backend
+cd backend && npm run dev
+
+# Terminal 3: React / Vite Frontend
+cd frontend && npm run dev
+```
+
 

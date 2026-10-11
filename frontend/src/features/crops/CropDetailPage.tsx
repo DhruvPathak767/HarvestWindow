@@ -39,6 +39,7 @@ import { api } from "@/services/api";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { WeatherRiskCard } from "@/components/weather/WeatherRiskCard";
 import { YieldPredictionCard } from "@/components/yield/YieldPredictionCard";
+import { CropHealthSection } from "@/components/cropHealth/CropHealthSection";
 import { useWeatherRisk } from "@/hooks/useWeatherRisk";
 
 export default function CropDetailPage() {
@@ -613,6 +614,14 @@ export default function CropDetailPage() {
       {/* Phase AI-5 Yield Forecasting & Production Estimation Engine */}
       <section aria-label="Yield Forecasting and Production Estimates">
         <YieldPredictionCard
+          cropId={crop.id}
+          cropName={crop.name}
+        />
+      </section>
+
+      {/* Phase AI-6 Crop Disease and Health Detection Engine */}
+      <section aria-label="Crop Disease and Health Detection">
+        <CropHealthSection
           cropId={crop.id}
           cropName={crop.name}
         />

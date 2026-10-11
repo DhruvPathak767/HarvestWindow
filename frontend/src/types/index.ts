@@ -520,3 +520,4 @@ export interface AgriDataQuality {
 
 export * from "./weatherRisk";
 export * from "./yieldPrediction";
+export * from "./cropHealth";

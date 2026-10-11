@@ -12,6 +12,7 @@ import {
   Map,
   RotateCcw,
   Settings as SettingsIcon,
+  ShieldAlert,
   Tractor,
 } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
@@ -22,6 +23,7 @@ import { cn } from "@/utils/cn";
 const NAV = [
   { to: "/app", label: "Overview", icon: LayoutDashboard, end: true },
   { to: "/app/farms", label: "My Farms", icon: Map },
+  { to: "/app/crop-health", label: "Crop Health", icon: ShieldAlert },
   { to: "/app/forecast", label: "Harvest Forecast", icon: BarChart3 },
   { to: "/app/weather", label: "Weather", icon: CloudSun },
   { to: "/app/recommendations", label: "Recommendations", icon: ListChecks },

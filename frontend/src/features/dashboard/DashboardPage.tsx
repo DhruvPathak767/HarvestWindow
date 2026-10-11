@@ -38,6 +38,7 @@ import { formatArea, formatTemperature } from "@/utils/units";
 import { cn } from "@/utils/cn";
 import { CropStatusChart } from "./CropStatusChart";
 import { FarmProductionWidget } from "@/components/yield/FarmProductionWidget";
+import { CropHealthWidget } from "@/components/cropHealth/CropHealthWidget";
 
 type Filter = "all" | "approaching" | "in-window" | "attention";
 
@@ -627,6 +628,11 @@ export default function DashboardPage() {
           farmId={activeFarm?.id || (farms.length > 0 ? farms[0].id : undefined)}
           farmName={activeFarm?.name || (farms.length > 0 ? farms[0].name : undefined)}
         />
+      </section>
+
+      {/* Phase AI-6: Crop Disease and Health Detection Widget */}
+      <section aria-label="Crop Disease and Health Intelligence">
+        <CropHealthWidget />
       </section>
 
       {/* C & D. Crop Status Distribution & Signature Harvest Window */}

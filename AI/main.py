@@ -206,6 +206,74 @@ def get_yield_health():
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
+# ============================================================================
+# Phase AI-6: Crop Disease and Health Detection Endpoints
+# ============================================================================
+from fastapi import UploadFile, File, Form
+from crop_health.inference import CropHealthInferenceService
+from crop_health.schemas import (
+    CropHealthPredictionResponse,
+    ModelInfoResponse,
+    HealthStatusResponse
+)
+from crop_health.class_registry import get_all_classes
+from crop_health.config import SUPPORTED_CROPS
+
+crop_health_service = CropHealthInferenceService()
+
+@app.get("/crop-health/health", response_model=HealthStatusResponse)
+def crop_health_health():
+    return HealthStatusResponse(
+        status="healthy",
+        version="1.0.0",
+        service="crop_health_ai",
+        model_loaded=crop_health_service.is_ready,
+        timestamp=datetime.now(timezone.utc).isoformat()
+    )
+
+@app.get("/crop-health/ready")
+def crop_health_readiness():
+    return {
+        "status": "ready" if crop_health_service.is_ready else "unavailable",
+        "model_loaded": crop_health_service.is_ready,
+        "classes_count": len(crop_health_service.index_to_class),
+        "supported_crops": SUPPORTED_CROPS,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+@app.get("/crop-health/model-info", response_model=ModelInfoResponse)
+def crop_health_model_info():
+    meta = crop_health_service.metadata
+    all_classes = sorted(get_all_classes())
+    return ModelInfoResponse(
+        model_name=meta.get("model_name", "HarvestWindow Crop Disease & Health Detection Engine"),
+        model_version=meta.get("model_version", "1.0.0"),
+        architecture=meta.get("architecture", "MobileNetV3-Small (Transfer Learning)"),
+        total_classes=len(all_classes),
+        supported_crops=SUPPORTED_CROPS,
+        supported_classes=all_classes,
+        input_dimensions=meta.get("input_dimensions", "224x224x3"),
+        readiness_status=meta.get("readiness_status", "READY" if crop_health_service.is_ready else "UNAVAILABLE"),
+        evaluation_metrics=meta.get("evaluation_metrics"),
+        training_dataset=meta.get("training_dataset", "Jharkhand Agricultural Field Plant Pathology Dataset")
+    )
+
+@app.post("/crop-health/predict", response_model=CropHealthPredictionResponse)
+async def predict_crop_health(
+    file: UploadFile = File(...),
+    crop_hint: str = Form(None)
+):
+    try:
+        contents = await file.read()
+        return crop_health_service.predict_image(contents, crop_hint=crop_hint)
+    except Exception as exc:
+        logger.exception("Crop health prediction error: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Inference error: {str(exc)}"
+        )
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)
+

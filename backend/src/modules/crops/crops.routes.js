@@ -25,8 +25,14 @@ import {
   refreshCropYieldHandler,
   recordActualProductionHandler,
 } from "../yield/yield.controller.js";
+import {
+  analyzeCropHealth,
+  getUserHistory,
+} from "../cropHealth/cropHealth.controller.js";
+import { uploadImageMiddleware } from "../cropHealth/cropHealth.service.js";
 
 const router = Router();
+
 
 // Enforce authentication across all crop routes
 router.use(authenticate);
@@ -82,6 +88,23 @@ router.post(
   "/:cropId/actual-production",
   validate(cropIdParamSchema, "params"),
   recordActualProductionHandler
+);
+
+// Phase AI-6 Crop Disease & Health Detection
+router.post(
+  "/:cropId/health-analysis",
+  validate(cropIdParamSchema, "params"),
+  uploadImageMiddleware.single("image"),
+  analyzeCropHealth
+);
+
+router.get(
+  "/:cropId/health-history",
+  validate(cropIdParamSchema, "params"),
+  (req, res, next) => {
+    req.query.cropId = req.params.cropId;
+    return getUserHistory(req, res, next);
+  }
 );
 
 // D. Update a crop (supports both PATCH and PUT)

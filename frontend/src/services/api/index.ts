@@ -23,6 +23,10 @@ import type {
   ProductionEstimateResult,
   FarmProductionSummary,
   ActualHarvestProduction,
+  CropHealthAnalysis,
+  CropHealthPredictionResponse,
+  CropHealthHistoryResponse,
+  CropHealthStatusResponse,
 } from "@/types";
 import {
   buildEmptySnapshot,
@@ -83,7 +87,9 @@ async function apiRequest<T>(
 ): Promise<T> {
   const token = getAuthToken();
   const headers = new Headers(options.headers || {});
-  headers.set("Content-Type", "application/json");
+  if (!(options.body instanceof FormData)) {
+    headers.set("Content-Type", "application/json");
+  }
 
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
@@ -1732,6 +1738,70 @@ export const api: HarvestWindowApi = {
       }
     }
     return null;
+  },
+
+  // ==========================================
+  // Phase AI-6: Crop Disease & Health Detection API
+  // ==========================================
+
+  async analyzeCropHealth(
+    formData: FormData,
+    cropId?: string
+  ): Promise<CropHealthAnalysis> {
+    const endpoint = cropId
+      ? `/crops/${cropId}/health-analysis`
+      : `/ai/crop-health/analyze`;
+    const res = await apiRequest<{ success: boolean; data: CropHealthAnalysis }>(
+      endpoint,
+      {
+        method: "POST",
+        body: formData,
+      }
+    );
+    return res.data;
+  },
+
+  async getCropHealthHistory(params?: {
+    cropId?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<CropHealthHistoryResponse> {
+    let endpoint = "/ai/crop-health/history";
+    const query = new URLSearchParams();
+    if (params?.cropId) query.set("cropId", params.cropId);
+    if (params?.page) query.set("page", String(params.page));
+    if (params?.limit) query.set("limit", String(params.limit));
+    const qs = query.toString();
+    if (qs) endpoint += `?${qs}`;
+
+    const res = await apiRequest<{ success: boolean; data: CropHealthHistoryResponse }>(
+      endpoint
+    );
+    return res.data;
+  },
+
+  async getCropHealthAnalysis(analysisId: string): Promise<CropHealthAnalysis> {
+    const res = await apiRequest<{ success: boolean; data: CropHealthAnalysis }>(
+      `/ai/crop-health/analyses/${analysisId}`
+    );
+    return res.data;
+  },
+
+  async deleteCropHealthAnalysis(analysisId: string): Promise<boolean> {
+    const res = await apiRequest<{ success: boolean }>(
+      `/ai/crop-health/analyses/${analysisId}`,
+      {
+        method: "DELETE",
+      }
+    );
+    return res.success;
+  },
+
+  async getCropHealthStatus(): Promise<CropHealthStatusResponse> {
+    const res = await apiRequest<{ success: boolean; data: CropHealthStatusResponse }>(
+      `/ai/crop-health/status`
+    );
+    return res.data;
   },
 };
 

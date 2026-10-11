@@ -1,0 +1,49 @@
+{
+  "audit_timestamp": "2026-10-11T04:14:59.851664+00:00",
+  "dataset_name": "Dipra444/plant-leaf-disease-jharkhand",
+  "dataset_source": "Hugging Face Hub / Jharkhand Agricultural Field Plant Pathology Collection",
+  "license": "Creative Commons Attribution-NonCommercial (CC BY-NC 4.0)",
+  "total_images": 6045,
+  "sample_scanned_count": 2000,
+  "total_classes": 25,
+  "supported_crops_count": 5,
+  "supported_crops": [
+    "Apple",
+    "Corn (Maize)",
+    "Grape",
+    "Potato",
+    "Tomato"
+  ],
+  "healthy_classes_count": 5,
+  "healthy_classes": [
+    "Apple___healthy",
+    "Corn_(maize)___healthy",
+    "Grape___healthy",
+    "Potato___healthy",
+    "Tomato___healthy"
+  ],
+  "diseased_classes_count": 20,
+  "sample_class_distribution": {
+    "Apple___Apple_scab": 248,
+    "Apple___Black_rot": 248,
+    "Apple___Cedar_apple_rust": 220,
+    "Apple___healthy": 248,
+    "Corn_(maize)___Cercospora_leaf_spot Gray_leaf_spot": 248,
+    "Corn_(maize)___Common_rust_": 248,
+    "Corn_(maize)___Northern_Leaf_Blight": 248,
+    "Corn_(maize)___healthy": 248,
+    "Grape___Black_rot": 44
+  },
+  "image_specifications": {
+    "format": "JPEG / RGB",
+    "native_resolution": "227x227 or 256x256",
+    "target_input_size": "224x224 (CenterCrop)",
+    "color_space": "RGB 3-channel"
+  },
+  "data_leakage_safeguards": {
+    "stratified_split": true,
+    "train_val_test_ratio": "80% Train, 10% Validation, 10% Held-out Test",
+    "test_set_isolation": "Held-out test set evaluated strictly once after final model training checkpoint"
+  },
+  "readiness_status": "READY_FOR_TRANSFER_LEARNING"
+}
