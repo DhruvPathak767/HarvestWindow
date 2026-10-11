@@ -4,7 +4,10 @@ Unit and integration tests for CSV ingestion pipeline in AI/ingestion/crop_calen
 import os
 import tempfile
 import pytest
-from AI.ingestion.crop_calendar_import import import_crop_calendar_csv
+try:
+    from ingestion.crop_calendar_import import import_crop_calendar_csv
+except ImportError:
+    from AI.ingestion.crop_calendar_import import import_crop_calendar_csv
 
 SAMPLE_CSV_CONTENT = """crop_name,scientific_name,category,variety_name,state,district,season,sowing_start_month,sowing_start_day,sowing_end_month,sowing_end_day,harvest_start_month,harvest_start_day,harvest_end_month,harvest_end_day,duration_min_days,duration_typical_days,duration_max_days,base_temp_c,upper_temp_c,gdd_min,gdd_typical,gdd_max,gdd_method,soil_types,soil_ph_min,soil_ph_max,temp_min_c,temp_max_c,rainfall_min_mm,rainfall_max_mm,water_requirement_notes,source_name,source_url,publisher,verification_status,notes
 Wheat,Triticum aestivum,Cereals,PBW 343,Punjab,Ludhiana,Rabi,11,1,11,25,4,1,4,20,125,135,145,4.5,30.0,1500,1650,1800,Standard Daily Mean,"Alluvial",6.0,7.5,10.0,25.0,300,450,4 critical irrigations,PAU Ludhiana,https://pau.edu,PAU,verified,Standard North wheat

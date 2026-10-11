@@ -2,15 +2,26 @@
 Unit tests for data normalization utilities in AI/ingestion/normalize.py
 """
 import pytest
-from AI.ingestion.normalize import (
-    clean_text,
-    normalize_crop_name,
-    normalize_season_name,
-    normalize_state_name,
-    normalize_district_name,
-    safe_float,
-    safe_int,
-)
+try:
+    from ingestion.normalize import (
+        clean_text,
+        normalize_crop_name,
+        normalize_season_name,
+        normalize_state_name,
+        normalize_district_name,
+        safe_float,
+        safe_int,
+    )
+except ImportError:
+    from AI.ingestion.normalize import (
+        clean_text,
+        normalize_crop_name,
+        normalize_season_name,
+        normalize_state_name,
+        normalize_district_name,
+        safe_float,
+        safe_int,
+    )
 
 def test_clean_text():
     assert clean_text("   Rice   ") == "Rice"

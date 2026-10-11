@@ -14,7 +14,8 @@ if ai_dir not in sys.path:
 import json
 import logging
 from datetime import datetime, timezone
-from fastapi import FastAPI, HTTPException, status
+from typing import Optional
+from fastapi import FastAPI, HTTPException, status, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 
 from harvest_prediction.schemas import (
@@ -37,13 +38,28 @@ from yield_forecasting.schemas import (
 from yield_forecasting.predict import YieldPredictionService
 from yield_forecasting.production_estimator import estimate_total_production
 
+# Phase AI-4: Crop Recommendation & Suitability Engine
+from crop_recommendation.engine import CropRecommendationEngine, DEFAULT_FACTOR_WEIGHTS
+from crop_recommendation.knowledge import (
+    CROPS_KNOWLEDGE_BASE,
+    SUPPORTED_SEASONS,
+    RECOGNIZED_SOIL_TYPES,
+)
+from crop_recommendation.schemas import (
+    CropRecommendationRequest,
+    CropRecommendationResponse,
+    RecommendationMetadataResponse,
+)
+from crop_recommendation.data.fao_gaez_adapter import FaoGaezAdapter
+from crop_recommendation.ml.predictor import CropMLPredictor
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("harvest_prediction_api")
 
 app = FastAPI(
     title="HarvestWindow AI Engine",
-    description="Agronomic, GDD, and Weather-Aware Harvest Window Prediction Service",
-    version="2.0.0"
+    description="Agronomic, GDD, and Weather-Aware Harvest Window Prediction & Crop Recommendation Service",
+    version="2.1.0"
 )
 
 app.add_middleware(
@@ -278,6 +294,74 @@ async def predict_crop_health(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Inference error: {str(exc)}"
+        )
+
+
+# Crop Recommendation Engine instance
+crop_engine = CropRecommendationEngine()
+
+# ==============================================================================
+# PHASE AI-4: CROP RECOMMENDATION & SUITABILITY ENDPOINTS
+# ==============================================================================
+
+@app.get("/crop-recommendation/metadata", response_model=RecommendationMetadataResponse)
+def get_crop_recommendation_metadata():
+    """
+    Returns supported crops, seasons, recognized soils, provisional weights,
+    and status of ML model and FAO GAEZ integration.
+    """
+    ml_predictor = CropMLPredictor.get_instance()
+    supported_crops = sorted([c["crop_name"] for c in CROPS_KNOWLEDGE_BASE])
+
+    return RecommendationMetadataResponse(
+        engine_name="HarvestWindow Crop Suitability & Recommendation Engine",
+        engine_version="1.0.0-hybrid-gaez",
+        supported_crops_count=len(supported_crops),
+        supported_crops=supported_crops,
+        supported_seasons=SUPPORTED_SEASONS,
+        recognized_soil_types=RECOGNIZED_SOIL_TYPES,
+        factor_weights=DEFAULT_FACTOR_WEIGHTS,
+        ml_model_status=ml_predictor.get_model_info(),
+        fao_gaez_status={
+            "adapter": "FaoGaezAdapter v4",
+            "coverage": "All 28 Indian States & 8 Union Territories across 19 AEZs",
+            "source": "FAO/IIASA Global Agro-Ecological Zones (GAEZ v4)",
+            "status": "active"
+        }
+    )
+
+@app.post("/crop-recommendation/evaluate", response_model=CropRecommendationResponse)
+def evaluate_crop_recommendation(request: CropRecommendationRequest):
+    """
+    Evaluates farm suitability against agronomic, pedological, seasonal,
+    climatic, and optional ML classification baselines.
+    """
+    try:
+        results = crop_engine.evaluate_farm_suitability(
+            farm_id=request.farm_id,
+            state=request.state,
+            district=request.district,
+            season=request.season,
+            current_month=request.current_month,
+            soil_type=request.soil_type,
+            soil_ph=request.soil_ph,
+            nitrogen=request.nitrogen,
+            phosphorus=request.phosphorus,
+            potassium=request.potassium,
+            irrigation_source=request.irrigation_source,
+            temperature=request.temperature,
+            rainfall=request.rainfall,
+            humidity=request.humidity,
+            latitude=request.latitude,
+            longitude=request.longitude,
+            top_k=request.top_k,
+        )
+        return results
+    except Exception as exc:
+        logger.exception("Error evaluating crop recommendations: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Crop recommendation engine failure: {str(exc)}"
         )
 
 if __name__ == "__main__":
