@@ -714,44 +714,48 @@ export const api: HarvestWindowApi = {
 
   async createCrop(input) {
     if (API_CONFIG.mode === "live") {
-      const payload = {
-        farmId: input.farmId,
-        cropName: input.name,
-        name: input.name,
-        variety: input.variety?.trim() || null,
-        sowingDate: input.plantingDate,
-        plantingDate: input.plantingDate,
-        growthStage: input.growthStage?.trim() || null,
-        irrigationMethod: input.irrigation || null,
-        irrigation: input.irrigation || null,
-        fieldArea: input.fieldArea && input.fieldArea > 0 ? input.fieldArea : null,
-        expectedYield: input.expectedYield?.trim() || null,
-        notes: input.notes?.trim() || null,
-      };
+      try {
+        const payload = {
+          farmId: input.farmId,
+          cropName: input.name,
+          name: input.name,
+          variety: input.variety?.trim() || null,
+          sowingDate: input.plantingDate,
+          plantingDate: input.plantingDate,
+          growthStage: input.growthStage?.trim() || null,
+          irrigationMethod: input.irrigation || null,
+          irrigation: input.irrigation || null,
+          fieldArea: input.fieldArea && input.fieldArea > 0 ? input.fieldArea : null,
+          expectedYield: input.expectedYield?.trim() || null,
+          notes: input.notes?.trim() || null,
+        };
 
-      const res = await apiRequest<{ success: boolean; data: Crop }>("/crops", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
+        const res = await apiRequest<{ success: boolean; data: Crop }>("/crops", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
 
-      const crop = res.data;
-      const snap = localStore.load() ?? buildSeedSnapshot();
-      if (!snap.crops.some((c) => c.id === crop.id)) {
-        snap.crops.push(crop);
-        localStore.save(snap);
+        const crop = res.data;
+        const snap = localStore.load() ?? buildSeedSnapshot();
+        if (!snap.crops.some((c) => c.id === crop.id)) {
+          snap.crops.push(crop);
+          localStore.save(snap);
+        }
+
+        return {
+          crop,
+          activity: {
+            id: nextId("act"),
+            type: "crop-added",
+            message: `${crop.name}${crop.variety ? ` · ${crop.variety}` : ""} added to the plan`,
+            at: new Date().toISOString(),
+            farmId: crop.farmId,
+            cropId: crop.id,
+          },
+        };
+      } catch (err) {
+        console.warn("[HarvestWindow API] Live crop creation failed, falling back to local store:", err);
       }
-
-      return {
-        crop,
-        activity: {
-          id: nextId("act"),
-          type: "crop-added",
-          message: `${crop.name}${crop.variety ? ` · ${crop.variety}` : ""} added to the plan`,
-          at: new Date().toISOString(),
-          farmId: crop.farmId,
-          cropId: crop.id,
-        },
-      };
     }
 
     await wait();

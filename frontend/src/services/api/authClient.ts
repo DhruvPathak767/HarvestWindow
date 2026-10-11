@@ -176,10 +176,16 @@ async function refreshSessionInternal(): Promise<LoginResult | null> {
     const json = (await response.json()) as AuthApiResponse<LoginResult>;
     if (json.success && json.data?.accessToken) {
       memoryAccessToken = json.data.accessToken;
+      try {
+        window.localStorage.setItem("harvestwindow.auth.token", json.data.accessToken);
+      } catch {}
       return json.data;
     }
 
     memoryAccessToken = null;
+    try {
+      window.localStorage.removeItem("harvestwindow.auth.token");
+    } catch {}
     return null;
   } catch {
     memoryAccessToken = null;
@@ -189,11 +195,26 @@ async function refreshSessionInternal(): Promise<LoginResult | null> {
 
 export const authClient = {
   getAccessToken(): string | null {
-    return memoryAccessToken;
+    if (memoryAccessToken) return memoryAccessToken;
+    try {
+      const stored = window.localStorage.getItem("harvestwindow.auth.token");
+      if (stored) {
+        memoryAccessToken = stored;
+        return stored;
+      }
+    } catch {}
+    return null;
   },
 
   setAccessToken(token: string | null) {
     memoryAccessToken = token;
+    try {
+      if (token) {
+        window.localStorage.setItem("harvestwindow.auth.token", token);
+      } else {
+        window.localStorage.removeItem("harvestwindow.auth.token");
+      }
+    } catch {}
   },
 
   /**
@@ -225,6 +246,9 @@ export const authClient = {
 
     if (result.accessToken) {
       memoryAccessToken = result.accessToken;
+      try {
+        window.localStorage.setItem("harvestwindow.auth.token", result.accessToken);
+      } catch {}
     }
 
     return result;
@@ -235,7 +259,7 @@ export const authClient = {
    */
   async getMe(): Promise<{ user: AuthUser }> {
     // If we do not currently have a token in memory, attempt a refresh via HttpOnly cookie first
-    if (!memoryAccessToken) {
+    if (!this.getAccessToken()) {
       const refreshed = await refreshSessionInternal();
       if (!refreshed) {
         throw new ApiError("No active authenticated session found.", 401);
@@ -265,6 +289,9 @@ export const authClient = {
       });
     } finally {
       memoryAccessToken = null;
+      try {
+        window.localStorage.removeItem("harvestwindow.auth.token");
+      } catch {}
     }
   },
 };
