@@ -522,3 +522,5 @@ export * from "./weatherRisk";
 export * from "./yieldPrediction";
 export * from "./cropHealth";
 export * from "./monitoring";
+export * from "./assistant";
+export * from "./notifications";

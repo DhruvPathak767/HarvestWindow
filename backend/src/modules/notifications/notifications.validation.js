@@ -23,6 +23,8 @@ export const listNotificationsQuerySchema = z.object({
       return undefined;
     }, z.boolean().optional())
     .optional(),
+  status: z.string().trim().optional(),
+  severity: z.string().trim().optional(),
   type: z.string().trim().optional(),
   farmId: z.string().trim().optional(),
   cropId: z.string().trim().optional(),
@@ -34,10 +36,25 @@ export const notificationIdParamSchema = z.object({
 
 export const createNotificationSchema = z.object({
   type: z.string().trim().min(1, "Notification type is required"),
+  severity: z.string().trim().optional().default("info"),
   title: z.string().trim().min(1, "Title is required"),
   message: z.string().trim().min(1, "Message is required"),
+  recommendedAction: z.string().trim().optional().nullable(),
+  actionUrl: z.string().trim().optional().nullable(),
   farmId: z.string().trim().optional().nullable(),
   cropId: z.string().trim().optional().nullable(),
   link: z.string().trim().optional().nullable(),
   metadata: z.record(z.unknown()).optional().nullable(),
+});
+
+export const updatePreferencesSchema = z.object({
+  harvestWindowAlerts: z.boolean().optional(),
+  weatherCautions: z.boolean().optional(),
+  predictionChangeAlerts: z.boolean().optional(),
+  cropHealthAlerts: z.boolean().optional(),
+  yieldAlerts: z.boolean().optional(),
+  weeklySummary: z.boolean().optional(),
+  quietHoursStart: z.number().int().min(0).max(23).optional().nullable(),
+  quietHoursEnd: z.number().int().min(0).max(23).optional().nullable(),
+  minSeverity: z.enum(["info", "low", "medium", "high", "critical"]).optional(),
 });

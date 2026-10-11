@@ -1,6 +1,7 @@
 import { app } from "./app.js";
 import { config } from "./config/env.js";
 import { connectDatabase, prisma } from "./config/prisma.js";
+import { AlertScheduler } from "./modules/notifications/alertScheduler.js";
 
 async function startServer() {
   try {
@@ -16,10 +17,14 @@ async function startServer() {
       console.log(` Allowed Origin: ${config.FRONTEND_URL}`);
       console.log(` Database    : MySQL (Prisma ORM)`);
       console.log(`=================================================`);
+
+      // Initialize background alert scheduler
+      AlertScheduler.start();
     });
 
     const shutdown = async (signal) => {
       console.log(`\nReceived ${signal}. Shutting down gracefully...`);
+      AlertScheduler.stop();
       server.close(async () => {
         console.log("HTTP server closed.");
         await prisma.$disconnect();

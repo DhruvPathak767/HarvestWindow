@@ -21,6 +21,7 @@ import harvestPredictionRoutes from "./modules/forecasts/harvestPrediction.route
 import yieldRoutes from "./modules/yield/yield.routes.js";
 import cropHealthRoutes from "./modules/cropHealth/cropHealth.routes.js";
 import monitoringRoutes from "./modules/monitoring/monitoring.routes.js";
+import assistantRoutes from "./modules/assistant/assistant.routes.js";
 
 export const app = express();
 
@@ -136,6 +137,12 @@ app.use("/api/v1/ai/monitoring", monitoringRoutes);
 app.use("/api/ai/monitoring", monitoringRoutes);
 app.use("/api/v1/admin/ai/monitoring", monitoringRoutes);
 app.use("/api/admin/ai/monitoring", monitoringRoutes);
+
+// Phase AI-7: Agronomic AI Assistant
+app.use("/api/v1/ai/assistant", assistantRoutes);
+app.use("/api/ai/assistant", assistantRoutes);
+app.use("/api/v1/assistant", assistantRoutes);
+app.use("/api/assistant", assistantRoutes);
 
 // 404 Handler & Centralized Error Handler
 app.use(notFoundHandler);

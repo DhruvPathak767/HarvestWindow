@@ -571,6 +571,18 @@ function NotificationBell() {
                 </li>
               ))}
             </ul>
+            <div className="border-t border-line p-2 bg-cream/30">
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  navigate("/app/notifications");
+                }}
+                className="w-full rounded-md py-1.5 text-center font-display text-xs font-semibold text-forest hover:bg-forest/10 transition-colors"
+              >
+                Open Notification Center →
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

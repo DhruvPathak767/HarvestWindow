@@ -2,21 +2,24 @@ import {
   listNotificationsQuerySchema,
   notificationIdParamSchema,
   createNotificationSchema,
+  updatePreferencesSchema,
 } from "./notifications.validation.js";
 import {
   listNotifications,
   getUnreadCount,
   markNotificationRead,
   markAllNotificationsRead,
+  dismissNotification,
   createNotification,
   syncAlertsForUser,
+  getNotificationPreferences,
+  updateNotificationPreferences,
 } from "./notifications.service.js";
+import { AlertEngineService } from "./alertEngine.service.js";
 
 /**
  * GET /api/v1/notifications
  * GET /api/notifications
- *
- * Retrieves the authenticated user's notifications.
  */
 export async function handleListNotifications(req, res, next) {
   try {
@@ -39,8 +42,6 @@ export async function handleListNotifications(req, res, next) {
 /**
  * GET /api/v1/notifications/unread-count
  * GET /api/notifications/unread-count
- *
- * Retrieves the count of unread notifications for the authenticated user.
  */
 export async function handleGetUnreadCount(req, res, next) {
   try {
@@ -60,8 +61,6 @@ export async function handleGetUnreadCount(req, res, next) {
 /**
  * PATCH /api/v1/notifications/:id/read
  * PATCH /api/notifications/:id/read
- *
- * Marks a specific notification as read.
  */
 export async function handleMarkNotificationRead(req, res, next) {
   try {
@@ -81,8 +80,6 @@ export async function handleMarkNotificationRead(req, res, next) {
 /**
  * PATCH /api/v1/notifications/read-all
  * PATCH /api/notifications/read-all
- *
- * Marks all notifications for the authenticated user as read.
  */
 export async function handleMarkAllNotificationsRead(req, res, next) {
   try {
@@ -99,19 +96,78 @@ export async function handleMarkAllNotificationsRead(req, res, next) {
 }
 
 /**
- * POST /api/v1/notifications/sync-alerts
- * POST /api/notifications/sync-alerts
- *
- * Scans active weather cautions and harvest window predictions to generate persistent alerts.
+ * PATCH /api/v1/notifications/:id/dismiss
+ * PATCH /api/notifications/:id/dismiss
  */
-export async function handleSyncAlerts(req, res, next) {
+export async function handleDismissNotification(req, res, next) {
   try {
-    const result = await syncAlertsForUser(req.user.id, req.body?.preferences || {});
+    const { id } = notificationIdParamSchema.parse(req.params);
+    const updated = await dismissNotification(req.user.id, id);
 
     return res.status(200).json({
       success: true,
-      message: "Alerts synchronized successfully",
-      data: result,
+      message: "Notification dismissed successfully",
+      data: updated,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * GET /api/v1/notifications/preferences
+ * GET /api/notifications/preferences
+ */
+export async function handleGetPreferences(req, res, next) {
+  try {
+    const prefs = await getNotificationPreferences(req.user.id);
+
+    return res.status(200).json({
+      success: true,
+      message: "Notification preferences retrieved successfully",
+      data: prefs,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * PUT /api/v1/notifications/preferences
+ * PUT /api/notifications/preferences
+ */
+export async function handleUpdatePreferences(req, res, next) {
+  try {
+    const validated = updatePreferencesSchema.parse(req.body);
+    const updated = await updateNotificationPreferences(req.user.id, validated);
+
+    return res.status(200).json({
+      success: true,
+      message: "Notification preferences updated successfully",
+      data: updated,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * POST /api/v1/notifications/evaluate
+ * POST /api/notifications/evaluate
+ * POST /api/v1/notifications/sync-alerts
+ * POST /api/notifications/sync-alerts
+ */
+export async function handleSyncAlerts(req, res, next) {
+  try {
+    const result = await AlertEngineService.evaluateUserAlerts(req.user.id);
+
+    return res.status(200).json({
+      success: true,
+      message: "Alerts evaluated successfully",
+      data: {
+        ...result,
+        generated: result.createdAlerts ?? 0,
+      },
     });
   } catch (error) {
     next(error);
@@ -121,8 +177,6 @@ export async function handleSyncAlerts(req, res, next) {
 /**
  * POST /api/v1/notifications
  * POST /api/notifications
- *
- * Manually posts a notification for the current user.
  */
 export async function handleCreateNotification(req, res, next) {
   try {
