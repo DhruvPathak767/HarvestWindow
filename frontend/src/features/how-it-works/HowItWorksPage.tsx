@@ -13,7 +13,8 @@ import {
 import { PublicNav } from "@/components/navigation/PublicNav";
 import { SiteFooter } from "@/components/navigation/SiteFooter";
 import { Reveal } from "@/components/animation/Reveal";
-import { SectionLabel, buttonStyles } from "@/components/common/ui";
+import { SectionLabel } from "@/components/common/ui";
+import { buttonStyles } from "@/components/common/buttonStyles";
 import { CROP_CATALOG } from "@/data/mock/cropCatalog";
 import { MODEL_NOTE } from "@/services/forecast/forecastService";
 

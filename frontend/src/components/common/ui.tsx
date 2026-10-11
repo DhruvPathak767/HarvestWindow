@@ -16,41 +16,7 @@ import { READINESS_META } from "@/types";
 import { cn } from "@/utils/cn";
 
 /* --------------------------------------------------------------- Button */
-
-type Variant = "primary" | "secondary" | "ghost" | "gold" | "inverse" | "danger";
-type Size = "sm" | "md" | "lg";
-
-const VARIANTS: Record<Variant, string> = {
-  primary:
-    "bg-forest-deep text-cream hover:bg-forest border border-forest-deep hover:border-forest shadow-[0_10px_24px_-16px_rgba(22,61,43,0.9)]",
-  secondary:
-    "bg-white text-forest-deep border border-line hover:border-living hover:text-forest",
-  ghost: "bg-transparent text-forest-deep hover:bg-soft border border-transparent",
-  gold: "bg-gold text-forest-deep border border-gold hover:bg-gold-soft",
-  inverse: "bg-cream text-forest-deep border border-cream hover:bg-white",
-  danger: "bg-white text-danger border border-danger/35 hover:bg-danger/5",
-};
-
-const SIZES: Record<Size, string> = {
-  sm: "h-8 px-3 text-[12.5px] gap-1.5 rounded-sm",
-  md: "h-10 px-4 text-[13.5px] gap-2 rounded-md",
-  lg: "h-12 px-6 text-[15px] gap-2.5 rounded-md",
-};
-
-export function buttonStyles(
-  variant: Variant = "primary",
-  size: Size = "md",
-  className?: string
-) {
-  return cn(
-    "inline-flex items-center justify-center font-display font-semibold tracking-[-0.01em]",
-    "transition-[transform,background-color,border-color,box-shadow,color] duration-200",
-    "active:scale-[0.985] disabled:pointer-events-none disabled:opacity-55",
-    VARIANTS[variant],
-    SIZES[size],
-    className
-  );
-}
+import { buttonStyles, type ButtonVariant as Variant, type ButtonSize as Size } from "./buttonStyles";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;

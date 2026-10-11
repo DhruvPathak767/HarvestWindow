@@ -23,7 +23,8 @@ import {
   Bell,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { Card, CardHeader, Button, EmptyState, StatusBadge, buttonStyles } from "@/components/common/ui";
+import { Card, CardHeader, Button, EmptyState, StatusBadge } from "@/components/common/ui";
+import { buttonStyles } from "@/components/common/buttonStyles";
 import { MetricPanel } from "@/features/common/MetricPanel";
 import { CropCard } from "@/features/crops/CropCard";
 import { ActivityFeed } from "@/features/common/ActivityFeed";
