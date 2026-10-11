@@ -14,6 +14,9 @@ import {
   Settings as SettingsIcon,
   ShieldAlert,
   Tractor,
+  Bot,
+  Bell,
+  Sparkles,
 } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
 import { Tooltip } from "@/components/common/ui";
@@ -22,6 +25,8 @@ import { cn } from "@/utils/cn";
 
 const NAV = [
   { to: "/app", label: "Overview", icon: LayoutDashboard, end: true },
+  { to: "/app/assistant", label: "AI Assistant", icon: Bot, isAi: true },
+  { to: "/app/notifications", label: "Alerts Center", icon: Bell },
   { to: "/app/farms", label: "My Farms", icon: Map },
   { to: "/app/crop-health", label: "Crop Health", icon: ShieldAlert },
   { to: "/app/forecast", label: "Harvest Forecast", icon: BarChart3 },
@@ -50,6 +55,7 @@ export function Sidebar({
     resetDemoData,
     recommendations,
     settings,
+    unreadCount,
   } = useStore();
   const navigate = useNavigate();
   const [farmMenuOpen, setFarmMenuOpen] = useState(false);
@@ -199,7 +205,12 @@ export function Sidebar({
         <ul className="flex flex-col gap-0.5">
           {NAV.map((item) => {
             const Icon = item.icon;
-            const badge = item.to === "/app/recommendations" ? openRecommendations : 0;
+            const badge =
+              item.to === "/app/recommendations"
+                ? openRecommendations
+                : item.to === "/app/notifications"
+                ? unreadCount
+                : 0;
             const link = (
               <NavLink
                 to={item.to}

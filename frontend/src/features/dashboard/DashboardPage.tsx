@@ -19,6 +19,8 @@ import {
   Wind,
   CloudLightning,
   ShieldCheck,
+  Bot,
+  Bell,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardHeader, Button, EmptyState, StatusBadge, buttonStyles } from "@/components/common/ui";
@@ -298,6 +300,15 @@ export default function DashboardPage() {
             <Button
               variant="inverse"
               size="sm"
+              className="rounded-full bg-white/10 text-cream border-white/20 hover:bg-white/15 gap-1.5"
+              onClick={() => navigate("/app/assistant")}
+            >
+              <Bot className="h-4 w-4 text-gold" aria-hidden />
+              AI Assistant
+            </Button>
+            <Button
+              variant="inverse"
+              size="sm"
               className="rounded-full bg-white/10 text-cream border-white/20 hover:bg-white/15"
               onClick={() => navigate("/app/farms")}
             >
@@ -347,6 +358,38 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* AI Intelligence Hub Highlight Banner */}
+      <div className="flex flex-col gap-3 rounded-xl border border-forest/20 bg-forest/5 p-4 sm:flex-row sm:items-center sm:justify-between shadow-sm">
+        <div className="flex items-start gap-3">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-forest-deep text-gold shadow-sm">
+            <Bot className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <p className="font-display text-sm font-bold text-forest-deep">
+                Agricultural AI Assistant & Personalized Monitoring
+              </p>
+              <span className="rounded-full bg-gold/20 px-2 py-0.5 font-mono text-[10px] font-bold text-forest-deep">
+                AI-7 & AI-8 Active
+              </span>
+            </div>
+            <p className="mt-0.5 text-xs text-muted">
+              Get grounded explanations for harvest predictions, weather risks, and disease scans, or check your notification center.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="secondary" onClick={() => navigate("/app/notifications")} className="gap-1.5 text-xs">
+            <Bell className="h-3.5 w-3.5 text-forest" />
+            Alerts Center
+          </Button>
+          <Button size="sm" variant="primary" onClick={() => navigate("/app/assistant")} className="gap-1.5 text-xs">
+            <Bot className="h-3.5 w-3.5 text-gold" />
+            Ask Assistant
+          </Button>
+        </div>
+      </div>
 
       {/* A. Key Overview Statistics (Authoritative Backend Data) */}
       <section aria-label="Key indicators" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">

@@ -20,6 +20,7 @@ import agricultureRoutes from "./modules/agriculture/agriculture.routes.js";
 import harvestPredictionRoutes from "./modules/forecasts/harvestPrediction.routes.js";
 import yieldRoutes from "./modules/yield/yield.routes.js";
 import cropHealthRoutes from "./modules/cropHealth/cropHealth.routes.js";
+import assistantRoutes from "./modules/assistant/assistant.routes.js";
 
 export const app = express();
 
@@ -129,6 +130,11 @@ app.use("/api/v1/crop-health", cropHealthRoutes);
 app.use("/api/crop-health", cropHealthRoutes);
 app.use("/api/v1/ai/crop-health", cropHealthRoutes);
 app.use("/api/ai/crop-health", cropHealthRoutes);
+
+app.use("/api/v1/ai/assistant", assistantRoutes);
+app.use("/api/ai/assistant", assistantRoutes);
+app.use("/api/v1/assistant", assistantRoutes);
+app.use("/api/assistant", assistantRoutes);
 
 // 404 Handler & Centralized Error Handler
 app.use(notFoundHandler);
