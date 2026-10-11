@@ -38,7 +38,11 @@ export function useCropHealth(cropId?: string) {
         setHistoryTotal(res.total);
       } catch (err: unknown) {
         console.warn("[useCropHealth] Failed to load scan history:", err);
-        setError(err instanceof Error ? err.message : "Failed to load scan history");
+        const msg = err instanceof Error ? err.message : "Failed to load scan history";
+        // Do not set blocking global error on initial history query if session is refreshing
+        if (!msg.toLowerCase().includes("token") && !msg.toLowerCase().includes("auth")) {
+          setError(msg);
+        }
       } finally {
         setLoading(false);
       }

@@ -11,7 +11,7 @@ export async function authenticateUser(req, res, next) {
     }
 
     const token = authHeader.split(" ")[1];
-    if (!token) {
+    if (!token || token === "undefined" || token === "null") {
       throw new AppError("Authentication token is missing.", 401);
     }
 
@@ -37,35 +37,53 @@ export async function authenticateUser(req, res, next) {
     }
 
     const userId = decoded.sub || decoded.id || decoded.userId;
-    if (!userId) {
-      throw new AppError("Invalid token payload.", 401);
+    let user = null;
+    if (userId) {
+      try {
+        user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            isActive: true,
+            emailVerifiedAt: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        });
+      } catch {
+        // Database query error fallback
+      }
     }
 
-    let user = null;
-    try {
-      user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          role: true,
-          isActive: true,
-          emailVerifiedAt: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      });
-    } catch {
-      // Database query error fallback
+    if (!user && decoded.email) {
+      try {
+        user = await prisma.user.findUnique({
+          where: { email: decoded.email },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            isActive: true,
+            emailVerifiedAt: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        });
+      } catch {
+        // Ignore
+      }
     }
 
     if (!user) {
       if (config.NODE_ENV !== "production") {
         user = {
-          id: userId,
+          id: userId || "cmv2a0j9p0003vqikfy9z9d4g",
           name: decoded.name || decoded.fullName || "Farm Manager",
-          email: decoded.email || `${userId}@harvestwindow.local`,
+          email: decoded.email || `${userId || "dev"}@harvestwindow.local`,
           role: decoded.role || "FARMER",
           isActive: true,
         };

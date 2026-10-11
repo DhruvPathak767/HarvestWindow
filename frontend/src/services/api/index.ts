@@ -59,8 +59,10 @@ const TOKEN_STORAGE_KEY = "harvestwindow.auth.token";
 export function getAuthToken(): string | null {
   try {
     const memory = authClient.getAccessToken();
-    if (memory) return memory;
-    return window.localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (memory && memory !== "undefined" && memory !== "null") return memory;
+    const stored = window.localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (!stored || stored === "undefined" || stored === "null") return null;
+    return stored;
   } catch {
     return null;
   }
@@ -68,7 +70,7 @@ export function getAuthToken(): string | null {
 
 export function setAuthToken(token: string | null): void {
   try {
-    if (token) {
+    if (token && token !== "undefined" && token !== "null") {
       window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
     } else {
       window.localStorage.removeItem(TOKEN_STORAGE_KEY);
@@ -79,11 +81,12 @@ export function setAuthToken(token: string | null): void {
 }
 
 /**
- * Safe fetch wrapper for live backend calls with Bearer auth headers.
+ * Safe fetch wrapper for live backend calls with Bearer auth headers and automatic session recovery.
  */
 async function apiRequest<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  retry = true
 ): Promise<T> {
   const token = getAuthToken();
   const headers = new Headers(options.headers || {});
@@ -99,10 +102,33 @@ async function apiRequest<T>(
   const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
   const url = `${base}${path}`;
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers,
+      credentials: "include",
+    });
+  } catch (netErr) {
+    throw new Error(
+      "Unable to connect to HarvestWindow backend. Please verify server connectivity."
+    );
+  }
+
+  // Handle 401 Unauthorized by attempting session refresh once
+  if (response.status === 401 && retry && !endpoint.includes("/auth/")) {
+    try {
+      const refreshed = await authClient.refreshSession();
+      if (refreshed?.accessToken) {
+        setAuthToken(refreshed.accessToken);
+        return apiRequest<T>(endpoint, options, false);
+      } else {
+        setAuthToken(null);
+      }
+    } catch {
+      setAuthToken(null);
+    }
+  }
 
   const body = await response.json().catch(() => null);
 

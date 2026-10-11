@@ -4,6 +4,13 @@ Exposes endpoints for prediction, validation, model metadata, and dataset readin
 """
 
 import os
+import sys
+
+# Ensure AI directory is in Python path regardless of execution cwd
+ai_dir = os.path.dirname(os.path.abspath(__file__))
+if ai_dir not in sys.path:
+    sys.path.insert(0, ai_dir)
+
 import json
 import logging
 from datetime import datetime, timezone
