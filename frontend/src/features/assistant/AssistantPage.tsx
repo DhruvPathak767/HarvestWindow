@@ -269,7 +269,7 @@ export default function AssistantPage() {
                 </h1>
                 <span className="inline-flex items-center gap-1 rounded-full bg-forest/10 px-2 py-0.5 text-[10.5px] font-semibold text-forest">
                   <Sparkles className="h-3 w-3 text-gold" />
-                  Phase AI-7 Grounded RAG
+                  Grounded Agronomic RAG
                 </span>
               </div>
               <p className="text-[11.5px] text-muted">
@@ -445,9 +445,19 @@ export default function AssistantPage() {
 
           {/* Error Message */}
           {error && (
-            <div className="flex items-center gap-2 rounded-lg border border-danger/40 bg-danger/10 p-3 text-xs text-danger">
-              <AlertCircle className="h-4 w-4 shrink-0" />
-              <span>{error}</span>
+            <div className="flex items-center justify-between gap-2 rounded-lg border border-danger/40 bg-danger/10 p-3 text-xs text-danger">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{error}</span>
+              </div>
+              {(error.toLowerCase().includes("sign in") || error.toLowerCase().includes("authentication")) && (
+                <Link
+                  to="/sign-in"
+                  className="rounded bg-forest-deep px-2.5 py-1 text-[11px] font-semibold text-cream hover:bg-forest transition-colors shrink-0 shadow-sm"
+                >
+                  Sign In
+                </Link>
+              )}
             </div>
           )}
 

@@ -1,12 +1,25 @@
-import { API_CONFIG, getAuthToken } from "./index";
+import { API_CONFIG, getAuthToken, setAuthToken } from "./index";
+import { authClient } from "./authClient";
 import type {
   NotificationItem,
   NotificationPreferences,
   ListNotificationsParams,
 } from "@/types/notifications";
 
-async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = getAuthToken();
+async function request<T>(endpoint: string, options: RequestInit = {}, retry = true): Promise<T> {
+  let token = getAuthToken();
+  if (!token) {
+    try {
+      const refreshed = await authClient.refreshSession();
+      if (refreshed?.accessToken) {
+        token = refreshed.accessToken;
+        setAuthToken(token);
+      }
+    } catch {
+      // Session not active
+    }
+  }
+
   const headers = new Headers(options.headers || {});
   headers.set("Content-Type", "application/json");
   if (token) {
@@ -17,11 +30,30 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
   const url = `${base}${path}`;
 
-  const res = await fetch(url, {
-    ...options,
-    headers,
-    credentials: "include",
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...options,
+      headers,
+      credentials: "include",
+    });
+  } catch {
+    throw new Error("Unable to connect to notification service.");
+  }
+
+  // Handle 401 with auto-refresh retry
+  if (res.status === 401 && retry) {
+    try {
+      const refreshed = await authClient.refreshSession();
+      if (refreshed?.accessToken) {
+        setAuthToken(refreshed.accessToken);
+        return request<T>(endpoint, options, false);
+      }
+    } catch {
+      setAuthToken(null);
+    }
+    throw new Error("Authentication required. Please sign in to view alerts.");
+  }
 
   if (!res.ok) {
     const errorBody = await res.json().catch(() => ({}));
