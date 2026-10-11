@@ -2,11 +2,18 @@
 Unit tests for agronomic boundary and rule validation in AI/ingestion/validate.py
 """
 import pytest
-from AI.ingestion.validate import (
-    validate_crop_calendar_record,
-    validate_growth_profile,
-    validate_suitability_profile,
-)
+try:
+    from ingestion.validate import (
+        validate_crop_calendar_record,
+        validate_growth_profile,
+        validate_suitability_profile,
+    )
+except ImportError:
+    from AI.ingestion.validate import (
+        validate_crop_calendar_record,
+        validate_growth_profile,
+        validate_suitability_profile,
+    )
 
 def test_valid_crop_calendar_record():
     valid_record = {

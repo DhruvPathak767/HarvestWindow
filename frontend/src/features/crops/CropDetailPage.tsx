@@ -4,6 +4,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import {
   ArrowLeft,
   CalendarRange,
+  Camera,
   CheckCircle2,
   CloudRain,
   Flame,

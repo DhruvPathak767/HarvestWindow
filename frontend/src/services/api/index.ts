@@ -118,6 +118,55 @@ async function apiRequest<T>(
   return body as T;
 }
 
+/**
+ * Upload request helper for multipart/form-data.
+ */
+async function apiUploadRequest<T>(
+  endpoint: string,
+  formData: FormData,
+  options: RequestInit = {}
+): Promise<T> {
+  const token = getAuthToken();
+  const headers = new Headers(options.headers || {});
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const base = API_CONFIG.baseUrl.replace(/\/$/, "");
+  const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+  const url = `${base}${path}`;
+
+  const response = await fetch(url, {
+    ...options,
+    method: "POST",
+    headers,
+    body: formData,
+  });
+
+  const body = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const errorMsg =
+      body?.message ||
+      (Array.isArray(body?.errors)
+        ? body.errors
+            .map(
+              (e: { field?: string; message: string }) =>
+                `${e.field ? `${e.field}: ` : ""}${e.message}`
+            )
+            .join(", ")
+        : null) ||
+      `Server returned ${response.status} ${response.statusText}`;
+
+    const error = new Error(errorMsg);
+    (error as unknown as { status: number; body: unknown }).status = response.status;
+    (error as unknown as { status: number; body: unknown }).body = body;
+    throw error;
+  }
+
+  return body as T;
+}
+
 export interface ForecastBundle {
   weather: Record<string, WeatherSummary>;
   forecasts: Record<string, Forecast>;
@@ -1656,6 +1705,7 @@ export const authApi = {
     }
   },
 };
+
 
 /** Convenience: weather + forecasts for a set of farms/crops in one call. */
 export function buildIntelligence(

@@ -12,6 +12,7 @@ import {
   Map,
   RotateCcw,
   Settings as SettingsIcon,
+  ShieldAlert,
   Tractor,
 } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";

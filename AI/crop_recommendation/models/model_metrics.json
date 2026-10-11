@@ -1,0 +1,43 @@
+{
+  "model_name": "RandomForestCropClassifier",
+  "version": "1.0.0-rf-lightweight",
+  "features": [
+    "N",
+    "P",
+    "K",
+    "temperature",
+    "humidity",
+    "ph",
+    "rainfall"
+  ],
+  "n_samples": 110,
+  "n_classes": 22,
+  "classes": [
+    "apple",
+    "banana",
+    "blackgram",
+    "chickpea",
+    "coconut",
+    "coffee",
+    "cotton",
+    "grapes",
+    "jute",
+    "kidneybeans",
+    "lentil",
+    "maize",
+    "mango",
+    "mothbeans",
+    "mungbean",
+    "muskmelon",
+    "orange",
+    "papaya",
+    "pigeonpeas",
+    "pomegranate",
+    "rice",
+    "watermelon"
+  ],
+  "cv_accuracy": 0.9727,
+  "cv_macro_f1": 0.9697,
+  "trained_at": "2026-10-11T04:27:45.726974+00:00",
+  "artifact_size_kb": 1233.29
+}
