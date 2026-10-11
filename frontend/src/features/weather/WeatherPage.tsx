@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -18,6 +18,8 @@ import {
   Thermometer,
   TriangleAlert,
   Wind,
+  CloudLightning,
+  ShieldCheck,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge, Button, Card, CardHeader, EmptyState } from "@/components/common/ui";
@@ -26,8 +28,10 @@ import { ALL_FARMS, useStore } from "@/store/AppStore";
 import { CONDITION_LABEL } from "@/services/weather/weatherService";
 import { detectBrowserLocation } from "@/services/location/geolocationService";
 import { formatDate, formatWeekday, relativeTime } from "@/utils/date";
-import { formatTemperature } from "@/utils/units";
+import { formatArea, formatTemperature } from "@/utils/units";
 import { cn } from "@/utils/cn";
+import { api } from "@/services/api";
+import type { FarmWeatherRiskSummary } from "@/types";
 
 const CONDITION_ICON: Record<string, typeof Sun> = {
   clear: Sun,
@@ -59,6 +63,32 @@ export default function WeatherPage() {
   const activeFarm =
     farms.find((f) => f.id === selectedFarmId) ?? farms[0] ?? null;
   const summary = activeFarm ? weather[activeFarm.id] : null;
+
+  const [farmRiskSummary, setFarmRiskSummary] = useState<FarmWeatherRiskSummary | null>(null);
+  const [loadingFarmRisk, setLoadingFarmRisk] = useState<boolean>(false);
+
+  useEffect(() => {
+    let active = true;
+    if (activeFarm?.id && activeFarm?.latitude && activeFarm?.longitude) {
+      setLoadingFarmRisk(true);
+      api
+        .getFarmWeatherRisk(activeFarm.id)
+        .then((data) => {
+          if (active) setFarmRiskSummary(data);
+        })
+        .catch(() => {
+          if (active) setFarmRiskSummary(null);
+        })
+        .finally(() => {
+          if (active) setLoadingFarmRisk(false);
+        });
+    } else {
+      setFarmRiskSummary(null);
+    }
+    return () => {
+      active = false;
+    };
+  }, [activeFarm?.id, activeFarm?.latitude, activeFarm?.longitude]);
 
   const handleDetectAndSaveLocation = async () => {
     if (!activeFarm) return;
@@ -337,6 +367,107 @@ export default function WeatherPage() {
           </div>
         </Card>
       </section>
+
+      {/* Phase AI-3: Farm Weather Risk & Harvest Readiness Posture */}
+      {farmRiskSummary && farmRiskSummary.summary.totalCropsAssessed > 0 && (
+        <section aria-label="Farm Harvest Weather Risk Posture">
+          <Card className="overflow-hidden border-line">
+            <CardHeader
+              title={
+                <div className="flex items-center gap-2">
+                  <CloudLightning className="w-4 h-4 text-forest" />
+                  <span>Harvest Weather Posture · {activeFarm.name}</span>
+                </div>
+              }
+              subtitle="Aggregated weather risk evaluating crop lodging, wet field conditions, and drying suitability across blocks."
+              action={
+                <span className={cn(
+                  "px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider border",
+                  farmRiskSummary.summary.overallFarmSuitability === "FAVORABLE"
+                    ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                    : farmRiskSummary.summary.overallFarmSuitability === "CAUTION"
+                    ? "bg-amber-100 text-amber-800 border-amber-300"
+                    : "bg-red-100 text-red-800 border-red-300"
+                )}>
+                  {farmRiskSummary.summary.overallFarmSuitability} Farm Posture
+                </span>
+              }
+            />
+
+            <div className="p-5 pt-3 space-y-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3 rounded-lg border border-line bg-cream/40">
+                  <span className="text-[11.5px] text-muted">Blocks Assessed</span>
+                  <p className="text-[18px] font-bold text-forest-deep mt-0.5">
+                    {farmRiskSummary.summary.totalCropsAssessed}
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg border border-emerald-200 bg-emerald-50/60">
+                  <span className="text-[11.5px] text-emerald-800">Favorable Blocks</span>
+                  <p className="text-[18px] font-bold text-emerald-900 mt-0.5">
+                    {farmRiskSummary.summary.favorableCount}
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg border border-amber-200 bg-amber-50/60">
+                  <span className="text-[11.5px] text-amber-800">Caution Blocks</span>
+                  <p className="text-[18px] font-bold text-amber-900 mt-0.5">
+                    {farmRiskSummary.summary.cautionCount}
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg border border-red-200 bg-red-50/60">
+                  <span className="text-[11.5px] text-red-800">Unfavorable Blocks</span>
+                  <p className="text-[18px] font-bold text-red-900 mt-0.5">
+                    {farmRiskSummary.summary.unfavorableCount}
+                  </p>
+                </div>
+              </div>
+
+              {farmRiskSummary.crops.length > 0 && (
+                <div className="space-y-2 pt-1">
+                  <h4 className="text-[12px] font-bold text-forest-deep uppercase tracking-wider">
+                    Block-Specific Harvest Weather Suitability
+                  </h4>
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {farmRiskSummary.crops.map((c) => (
+                      <div
+                        key={c.cropId}
+                        onClick={() => c.cropId && navigate(`/app/crops/${c.cropId}`)}
+                        className="p-3 rounded-lg border border-line/80 bg-white hover:bg-soft/50 transition-colors cursor-pointer flex flex-col justify-between"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-bold text-[13px] text-forest-deep truncate">
+                              {c.cropName} {c.variety ? `(${c.variety})` : ""}
+                            </span>
+                            <span className={cn(
+                              "text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider border",
+                              c.harvestSuitability === "FAVORABLE"
+                                ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                : c.harvestSuitability === "CAUTION"
+                                ? "bg-amber-50 text-amber-800 border-amber-200"
+                                : "bg-red-50 text-red-800 border-red-200"
+                            )}>
+                              {c.harvestSuitability}
+                            </span>
+                          </div>
+                          <p className="text-[11.5px] text-muted mt-1">
+                            Risk score: <span className="font-semibold text-forest-deep">{c.overallRiskScore}/100</span> · {c.urgency} urgency
+                          </p>
+                        </div>
+                        {c.recommendations[0] && (
+                          <p className="text-[11px] text-forest-deep/80 mt-2 line-clamp-1 border-t border-line/40 pt-1.5">
+                            {c.recommendations[0]}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </Card>
+        </section>
+      )}
 
       <section aria-label="Harvest cautions" className="grid gap-5 lg:grid-cols-2">
         <Card>

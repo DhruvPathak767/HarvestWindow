@@ -17,6 +17,8 @@ import {
   Sprout,
   Thermometer,
   Wind,
+  CloudLightning,
+  ShieldCheck,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardHeader, Button, EmptyState, StatusBadge, buttonStyles } from "@/components/common/ui";
@@ -29,6 +31,7 @@ import { CropImage } from "@/components/common/CropImage";
 import { CROP_IMAGES } from "@/data/mock/cropCatalog";
 import { ALL_FARMS, useStore } from "@/store/AppStore";
 import { api, type DashboardData } from "@/services/api";
+import type { DashboardWeatherRiskSummary } from "@/types";
 import { CONDITION_LABEL } from "@/services/weather/weatherService";
 import { formatDate, relativeTime } from "@/utils/date";
 import { formatArea, formatTemperature } from "@/utils/units";
@@ -73,6 +76,7 @@ export default function DashboardPage() {
   } = useStore();
 
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [weatherRiskSummary, setWeatherRiskSummary] = useState<DashboardWeatherRiskSummary | null>(null);
   const [loadingDashboard, setLoadingDashboard] = useState<boolean>(true);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
 
@@ -84,8 +88,19 @@ export default function DashboardPage() {
     setLoadingDashboard(true);
     setDashboardError(null);
     try {
-      const data = await api.getDashboard();
-      setDashboardData(data);
+      const [dataRes, wRiskRes] = await Promise.allSettled([
+        api.getDashboard(),
+        api.getDashboardWeatherRisk(),
+      ]);
+      if (dataRes.status === "fulfilled") {
+        setDashboardData(dataRes.value);
+        if (dataRes.value?.weatherRiskSummary) {
+          setWeatherRiskSummary(dataRes.value.weatherRiskSummary);
+        }
+      }
+      if (wRiskRes.status === "fulfilled" && wRiskRes.value) {
+        setWeatherRiskSummary(wRiskRes.value);
+      }
     } catch (err: unknown) {
       console.warn("[DashboardPage] Failed to fetch backend dashboard:", err);
       setDashboardError(err instanceof Error ? err.message : "Unable to load dashboard data");
@@ -483,6 +498,127 @@ export default function DashboardPage() {
           </div>
         </Card>
       </section>
+
+      {/* Phase AI-3: Weather Intelligence & Operational Risk Overview */}
+      {weatherRiskSummary && weatherRiskSummary.summary.totalCropsAssessed > 0 && (
+        <section aria-label="Weather Intelligence & Risk Overview">
+          <Card className="border-line overflow-hidden">
+            <CardHeader
+              title={
+                <div className="flex items-center gap-2">
+                  <CloudLightning className="w-4 h-4 text-forest" />
+                  <span>Weather Intelligence & Harvest Risk Overview</span>
+                </div>
+              }
+              subtitle="Real-time multi-day meteorological evaluation across all active farm locations."
+              action={
+                <Link
+                  to="/app/forecast"
+                  className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-forest transition-colors hover:text-living"
+                >
+                  View full harvest matrix
+                  <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                </Link>
+              }
+            />
+
+            <div className="p-5 pt-3 space-y-4">
+              {/* Summary Stats Row */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="p-3.5 rounded-lg border border-line/60 bg-cream/40 flex flex-col justify-between">
+                  <span className="text-[12px] font-medium text-muted">Crops Assessed</span>
+                  <p className="text-[22px] font-extrabold font-display text-forest-deep mt-1">
+                    {weatherRiskSummary.summary.totalCropsAssessed}
+                  </p>
+                </div>
+                <div className="p-3.5 rounded-lg border border-emerald-200 bg-emerald-50/60 flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-emerald-800 text-[12px] font-medium">
+                    <span>Favorable Conditions</span>
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                  </div>
+                  <p className="text-[22px] font-extrabold font-display text-emerald-900 mt-1">
+                    {weatherRiskSummary.summary.favorableCount}
+                  </p>
+                </div>
+                <div className="p-3.5 rounded-lg border border-amber-200 bg-amber-50/60 flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-amber-800 text-[12px] font-medium">
+                    <span>Caution Advised</span>
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                  </div>
+                  <p className="text-[22px] font-extrabold font-display text-amber-900 mt-1">
+                    {weatherRiskSummary.summary.cautionCount}
+                  </p>
+                </div>
+                <div className="p-3.5 rounded-lg border border-red-200 bg-red-50/60 flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-red-800 text-[12px] font-medium">
+                    <span>Unfavorable Risk</span>
+                    <AlertTriangle className="w-3.5 h-3.5 text-red-600" />
+                  </div>
+                  <p className="text-[22px] font-extrabold font-display text-red-900 mt-1">
+                    {weatherRiskSummary.summary.unfavorableCount}
+                  </p>
+                </div>
+              </div>
+
+              {/* Urgent Action Crops Callout */}
+              {weatherRiskSummary.urgentCrops.length > 0 && (
+                <div className="space-y-2 pt-2">
+                  <h4 className="text-[12px] font-bold text-forest-deep uppercase tracking-wider flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                    Crops Requiring Weather Decision
+                  </h4>
+                  <div className="grid gap-2.5 sm:grid-cols-2">
+                    {weatherRiskSummary.urgentCrops.map((u) => (
+                      <div
+                        key={u.cropId}
+                        onClick={() => navigate(`/app/crops/${u.cropId}`)}
+                        className="p-3 rounded-lg border border-amber-200 bg-amber-50/40 hover:bg-amber-50 transition-all cursor-pointer space-y-1"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-[13.5px] text-forest-deep">
+                            {u.cropName} <span className="font-normal text-muted">({u.farmName})</span>
+                          </span>
+                          <span className="px-2 py-0.5 rounded text-[10.5px] font-bold uppercase bg-amber-200 text-amber-900">
+                            {u.urgency} Urgency
+                          </span>
+                        </div>
+                        {u.recommendedAction && (
+                          <p className="text-[12px] text-forest-deep/85 line-clamp-2">
+                            {u.recommendedAction}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Upcoming Adverse Events List */}
+              {weatherRiskSummary.upcomingAdverseEvents.length > 0 && (
+                <div className="space-y-2 pt-2">
+                  <h4 className="text-[12px] font-bold text-forest-deep uppercase tracking-wider flex items-center gap-1.5">
+                    <CloudRain className="w-3.5 h-3.5 text-info" />
+                    Forecast Meteorological Alerts
+                  </h4>
+                  <div className="space-y-1.5">
+                    {weatherRiskSummary.upcomingAdverseEvents.slice(0, 3).map((ev, i) => (
+                      <div
+                        key={i}
+                        className="p-2.5 rounded-md border border-line bg-cream/40 flex items-start gap-2.5 text-[12px]"
+                      >
+                        <span className="font-semibold text-forest-deep min-w-[120px]">
+                          {ev.farmName} · {ev.cropName}:
+                        </span>
+                        <span className="text-muted flex-1">{ev.message}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </Card>
+        </section>
+      )}
 
       {/* C & D. Crop Status Distribution & Signature Harvest Window */}
       <section

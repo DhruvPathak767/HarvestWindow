@@ -1,4 +1,5 @@
 import { resolveWeatherCode } from "./weather.constants.js";
+import { normalizeDailyForecastRecords } from "./weather.normalizer.js";
 import { AppError } from "../../middleware/errorHandler.js";
 
 const OPEN_METEO_BASE_URL =
@@ -8,6 +9,32 @@ const WEATHERAPI_BASE_URL =
   process.env.WEATHERAPI_BASE_URL || "https://api.weatherapi.com/v1";
 
 const DEFAULT_TIMEOUT_MS = Number(process.env.WEATHER_REQUEST_TIMEOUT_MS) || 8000;
+
+// Single-flight in-flight request tracker to prevent duplicate concurrent provider requests
+const inFlightRequests = new Map();
+
+/**
+ * Bounded retry helper for transient network errors with exponential backoff.
+ */
+async function fetchWithRetry(fn, maxRetries = 2, initialDelayMs = 250) {
+  let lastError;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      // Never retry client/auth errors (400, 401, 403)
+      if (err instanceof AppError && [400, 401, 403].includes(err.statusCode)) {
+        throw err;
+      }
+      if (attempt < maxRetries) {
+        const delay = initialDelayMs * Math.pow(2, attempt);
+        await new Promise((res) => setTimeout(res, delay));
+      }
+    }
+  }
+  throw lastError;
+}
 
 /**
  * Maps WeatherAPI.com condition text to HarvestWindow condition keys.
@@ -210,9 +237,16 @@ export function normalizeWeatherPayload(raw) {
     };
   });
 
+  const { records: normalizedRecords, dataQuality } = normalizeDailyForecastRecords(dailyForecast, {
+    provider: "Open-Meteo",
+    timezone: raw.timezone,
+  });
+
   return {
     current,
     dailyForecast,
+    normalizedRecords,
+    dataQuality,
     timezone: raw.timezone || "auto",
     elevationMeters: raw.elevation || 0,
     provider: "Open-Meteo",
@@ -288,33 +322,30 @@ export function normalizeWeatherApiPayload(raw, openMeteoForecast = null) {
     }
   }
 
+  const { records: normalizedRecords, dataQuality } = normalizeDailyForecastRecords(dailyForecast, {
+    provider: "WeatherAPI.com",
+    timezone: raw.location?.tz_id || openMeteoForecast?.timezone,
+  });
+
   return {
     current,
     dailyForecast,
+    normalizedRecords,
+    dataQuality,
     timezone: raw.location?.tz_id || openMeteoForecast?.timezone || "auto",
     elevationMeters: openMeteoForecast?.elevationMeters || 0,
     provider: "WeatherAPI.com" + (openMeteoForecast ? " (10-Day Extended)" : ""),
   };
 }
 
-/**
- * Primary multi-provider weather fetcher.
- * Uses WeatherAPI.com when WEATHERAPI_KEY is configured in .env,
- * seamlessly merged with Open-Meteo for full 10-day forecasts,
- * with automatic fallback to Open-Meteo.
- *
- * @param {number} latitude
- * @param {number} longitude
- * @param {Object} [options]
- */
-export async function fetchWeatherForecast(latitude, longitude, options = {}) {
+async function executeFetchWeatherForecast(latitude, longitude, options = {}) {
   const apiKey = process.env.WEATHERAPI_KEY;
 
   if (apiKey && apiKey.trim()) {
     try {
       const [weatherApiRes, openMeteoRes] = await Promise.allSettled([
-        fetchWeatherApiForecast(latitude, longitude, apiKey.trim(), WEATHERAPI_BASE_URL, options),
-        fetchOpenMeteoForecast(latitude, longitude, options),
+        fetchWithRetry(() => fetchWeatherApiForecast(latitude, longitude, apiKey.trim(), WEATHERAPI_BASE_URL, options)),
+        fetchWithRetry(() => fetchOpenMeteoForecast(latitude, longitude, options)),
       ]);
 
       if (weatherApiRes.status === "fulfilled") {
@@ -337,6 +368,37 @@ export async function fetchWeatherForecast(latitude, longitude, options = {}) {
   }
 
   // Fallback to pure Open-Meteo (no API key required)
-  const raw = await fetchOpenMeteoForecast(latitude, longitude, options);
+  const raw = await fetchWithRetry(() => fetchOpenMeteoForecast(latitude, longitude, options));
   return normalizeWeatherPayload(raw);
+}
+
+/**
+ * Primary multi-provider weather fetcher with single-flight deduplication.
+ * Uses WeatherAPI.com when WEATHERAPI_KEY is configured in .env,
+ * seamlessly merged with Open-Meteo for full 10-day forecasts,
+ * with automatic fallback to Open-Meteo.
+ *
+ * @param {number} latitude
+ * @param {number} longitude
+ * @param {Object} [options]
+ */
+export async function fetchWeatherForecast(latitude, longitude, options = {}) {
+  const latNum = Number(latitude);
+  const lonNum = Number(longitude);
+  const flightKey = `${latNum.toFixed(2)}:${lonNum.toFixed(2)}`;
+
+  if (inFlightRequests.has(flightKey)) {
+    return inFlightRequests.get(flightKey);
+  }
+
+  const promise = (async () => {
+    try {
+      return await executeFetchWeatherForecast(latNum, lonNum, options);
+    } finally {
+      inFlightRequests.delete(flightKey);
+    }
+  })();
+
+  inFlightRequests.set(flightKey, promise);
+  return promise;
 }

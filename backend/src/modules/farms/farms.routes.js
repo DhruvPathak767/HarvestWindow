@@ -13,6 +13,7 @@ import {
   handleUpdateFarm,
   handleDeleteFarm,
 } from "./farms.controller.js";
+import { handleGetFarmWeatherRisk } from "../weather/weatherRisk.controller.js";
 
 const router = Router();
 
@@ -27,6 +28,13 @@ router.post("/", validate(createFarmSchema, "body"), handleCreateFarm);
 
 // C. Retrieve one farm
 router.get("/:farmId", validate(farmIdParamSchema, "params"), handleGetFarm);
+
+// Phase AI-3 Weather Intelligence & Harvest Risk for Farm
+router.get(
+  "/:farmId/weather-risk",
+  validate(farmIdParamSchema, "params"),
+  handleGetFarmWeatherRisk
+);
 
 // D. Update a farm (support both PUT and PATCH)
 router.put(

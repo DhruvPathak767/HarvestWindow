@@ -14,6 +14,10 @@ import {
   handleUpdateCrop,
   handleDeleteCrop,
 } from "./crops.controller.js";
+import {
+  handleGetCropWeatherRisk,
+  handleRefreshCropWeatherRisk,
+} from "../weather/weatherRisk.controller.js";
 
 const router = Router();
 
@@ -28,6 +32,19 @@ router.post("/", validate(createCropSchema, "body"), handleCreateCrop);
 
 // C. Retrieve one crop
 router.get("/:cropId", validate(cropIdParamSchema, "params"), handleGetCrop);
+
+// Phase AI-3 Weather Intelligence & Harvest Risk
+router.get(
+  "/:cropId/weather-risk",
+  validate(cropIdParamSchema, "params"),
+  handleGetCropWeatherRisk
+);
+
+router.post(
+  "/:cropId/weather-risk/refresh",
+  validate(cropIdParamSchema, "params"),
+  handleRefreshCropWeatherRisk
+);
 
 // D. Update a crop (supports both PATCH and PUT)
 router.patch(

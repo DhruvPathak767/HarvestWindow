@@ -517,3 +517,5 @@ export interface AgriDataQuality {
   diseaseMetadataCount: number;
   verifiedSourcesCount: number;
 }
+
+export * from "./weatherRisk";

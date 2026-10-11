@@ -2,6 +2,7 @@ import prisma from "../../config/prisma.js";
 import { predictHarvestWindow } from "../forecasts/predictionEngine.js";
 import { getWeatherForFarm } from "../weather/weather.service.js";
 import { buildWeatherContext } from "../forecasts/weatherContext.js";
+import { getDashboardWeatherRisk } from "../weather/weatherRisk.service.js";
 
 /**
  * Retrieves consolidated dashboard data for the authenticated user.
@@ -234,6 +235,13 @@ export async function getDashboardData(userId) {
 
   const nextUpcomingDate = upcomingHarvests.length > 0 ? upcomingHarvests[0].harvestWindow.startDate : null;
 
+  let weatherRiskSummary = null;
+  try {
+    weatherRiskSummary = await getDashboardWeatherRisk(userId);
+  } catch (err) {
+    console.warn("[DashboardService] Could not compute weatherRiskSummary:", err.message);
+  }
+
   return {
     overview: {
       totalFarms: farms.length,
@@ -253,5 +261,6 @@ export async function getDashboardData(userId) {
       baselineOnlyCount,
       nextUpcomingDate,
     },
+    weatherRiskSummary,
   };
 }

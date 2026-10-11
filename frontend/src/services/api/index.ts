@@ -16,6 +16,9 @@ import type {
   AgriSuitabilityProfile,
   AgriDataSource,
   AgriDataQuality,
+  WeatherRiskAssessment,
+  FarmWeatherRiskSummary,
+  DashboardWeatherRiskSummary,
 } from "@/types";
 import {
   buildEmptySnapshot,
@@ -1530,6 +1533,72 @@ export const api: HarvestWindowApi = {
         return res.data;
       } catch (err) {
         console.warn("[HarvestWindow API] getAgriDataQuality failed:", err);
+      }
+    }
+    return null;
+  },
+
+  // ========================================================
+  // Phase AI-3: Weather Intelligence & Harvest Risk Engine
+  // ========================================================
+  async getCropWeatherRisk(cropId: string, forceRefresh = false): Promise<WeatherRiskAssessment | null> {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const query = forceRefresh ? "?refresh=true" : "";
+        const res = await apiRequest<{ success: boolean; data: WeatherRiskAssessment }>(
+          `/crops/${cropId}/weather-risk${query}`
+        );
+        return res.data;
+      } catch (err) {
+        console.warn("[HarvestWindow API] getCropWeatherRisk failed:", err);
+        throw err;
+      }
+    }
+    return null;
+  },
+
+  async refreshCropWeatherRisk(cropId: string): Promise<WeatherRiskAssessment | null> {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const res = await apiRequest<{ success: boolean; data: WeatherRiskAssessment }>(
+          `/crops/${cropId}/weather-risk/refresh`,
+          { method: "POST" }
+        );
+        return res.data;
+      } catch (err) {
+        console.warn("[HarvestWindow API] refreshCropWeatherRisk failed:", err);
+        throw err;
+      }
+    }
+    return null;
+  },
+
+  async getFarmWeatherRisk(farmId: string, forceRefresh = false): Promise<FarmWeatherRiskSummary | null> {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const query = forceRefresh ? "?refresh=true" : "";
+        const res = await apiRequest<{ success: boolean; data: FarmWeatherRiskSummary }>(
+          `/farms/${farmId}/weather-risk${query}`
+        );
+        return res.data;
+      } catch (err) {
+        console.warn("[HarvestWindow API] getFarmWeatherRisk failed:", err);
+        throw err;
+      }
+    }
+    return null;
+  },
+
+  async getDashboardWeatherRisk(): Promise<DashboardWeatherRiskSummary | null> {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const res = await apiRequest<{ success: boolean; data: DashboardWeatherRiskSummary }>(
+          "/dashboard/weather-risk"
+        );
+        return res.data;
+      } catch (err) {
+        console.warn("[HarvestWindow API] getDashboardWeatherRisk failed:", err);
+        throw err;
       }
     }
     return null;

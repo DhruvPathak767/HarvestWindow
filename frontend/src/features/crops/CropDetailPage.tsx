@@ -37,6 +37,8 @@ import { daysLabel, formatDate, formatTime, relativeTime } from "@/utils/date";
 import { cn } from "@/utils/cn";
 import { api } from "@/services/api";
 import { useToast } from "@/components/feedback/ToastProvider";
+import { WeatherRiskCard } from "@/components/weather/WeatherRiskCard";
+import { useWeatherRisk } from "@/hooks/useWeatherRisk";
 
 export default function CropDetailPage() {
   const { cropId } = useParams<{ cropId: string }>();
@@ -64,6 +66,14 @@ export default function CropDetailPage() {
   const [historyList, setHistoryList] = useState<any[]>([]);
 
   const crop = crops.find((c) => c.id === cropId) ?? null;
+
+  const {
+    assessment: weatherRiskAssessment,
+    loading: weatherRiskLoading,
+    refreshing: weatherRiskRefreshing,
+    error: weatherRiskError,
+    refresh: refreshWeatherRisk,
+  } = useWeatherRisk(crop?.id);
 
   useEffect(() => {
     if (cropId) {
@@ -585,6 +595,18 @@ export default function CropDetailPage() {
             )}
           </Card>
         </div>
+      </section>
+
+      {/* Phase AI-3 Weather Intelligence & Harvest Risk Engine */}
+      <section aria-label="Weather Intelligence and Harvest Risk">
+        <WeatherRiskCard
+          cropName={crop.name}
+          assessment={weatherRiskAssessment}
+          loading={weatherRiskLoading}
+          refreshing={weatherRiskRefreshing}
+          error={weatherRiskError}
+          onRefresh={refreshWeatherRisk}
+        />
       </section>
 
       {/* Verified Agronomic Knowledge Base (Phase AI-1) */}

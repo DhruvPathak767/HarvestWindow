@@ -24,6 +24,8 @@ const envSchema = z.object({
   ADMIN_EMAIL: z.string().email().default("admin@harvestwindow.local"),
   ADMIN_PASSWORD: z.string().min(8).default("HarvestAdmin#2026!Secure"),
   HARVEST_AI_SERVICE_URL: z.string().default("http://127.0.0.1:8000"),
+  WEATHERAPI_KEY: z.string().optional(),
+  WEATHERAPI_BASE_URL: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
