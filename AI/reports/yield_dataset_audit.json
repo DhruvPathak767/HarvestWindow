@@ -1,0 +1,149 @@
+{
+  "audit_timestamp": "2026-10-11T03:13:01.964142+00:00",
+  "dataset_name": "dhyann2815/india-crop-yield-prediction",
+  "file_source": "D:\\projects\\HarvestWindow\\AI\\datasets\\india_crop_yield.csv",
+  "raw_dataset": {
+    "total_rows": 17400,
+    "columns": [
+      "Year",
+      "State",
+      "Crop",
+      "Season",
+      "Area",
+      "Production",
+      "Annual_Rainfall",
+      "Fertilizer",
+      "Pesticide",
+      "Yield"
+    ],
+    "null_counts": {
+      "Year": 0,
+      "State": 0,
+      "Crop": 0,
+      "Season": 0,
+      "Area": 0,
+      "Production": 0,
+      "Annual_Rainfall": 0,
+      "Fertilizer": 0,
+      "Pesticide": 0,
+      "Yield": 0
+    },
+    "duplicate_rows": 0,
+    "raw_yield_summary": {
+      "min": 0.0,
+      "max": 21105.0,
+      "mean": 96.88664155977011,
+      "median": 1.0980910000000002,
+      "std": 978.9770562888796
+    }
+  },
+  "cleaned_dataset": {
+    "total_rows": 16873,
+    "rows_retained_pct": 96.97,
+    "unique_crops_count": 59,
+    "unique_states_count": 31,
+    "unique_seasons_count": 6,
+    "null_counts": {
+      "Year": 0,
+      "State": 0,
+      "Crop": 0,
+      "Season": 0,
+      "Area": 0,
+      "Production": 0,
+      "Annual_Rainfall": 0,
+      "Fertilizer": 0,
+      "Pesticide": 0,
+      "Yield": 0,
+      "Crop_Raw": 0
+    },
+    "cleaned_yield_summary_t_ha": {
+      "min": 0.0507,
+      "max": 197.0074,
+      "mean": 5.0957,
+      "median": 1.0928,
+      "std": 13.2482
+    }
+  },
+  "target_validation": {
+    "canonical_target_unit": "TONNE_PER_HECTARE (t/ha)",
+    "area_unit_in_source": "HECTARES",
+    "production_unit_in_source": "METRIC_TONNES",
+    "unit_exceptions_identified": [
+      "Coconut is historically enumerated in count of nuts rather than metric tonnes; excluded from weight-based supervised yield regression to prevent target distortion."
+    ]
+  },
+  "crop_coverage_top25": {
+    "Mustard": 684,
+    "Rice": 654,
+    "Maize": 609,
+    "Sugarcane": 598,
+    "Wheat": 536,
+    "Sesamum": 519,
+    "Potato": 503,
+    "Pigeon Pea": 495,
+    "Groundnut": 487,
+    "Moong": 486,
+    "Chickpea": 485,
+    "Urad": 448,
+    "Cotton": 417,
+    "Turmeric": 406,
+    "Bajra": 398,
+    "Other Kharif Pulses": 398,
+    "Small Millets": 397,
+    "Jowar": 396,
+    "Onion": 396,
+    "Other  Rabi Pulses": 372,
+    "Ragi": 349,
+    "Soybean": 344,
+    "Masoor": 329,
+    "Dry Chillies": 325,
+    "Linseed": 323
+  },
+  "state_coverage_top20": {
+    "Karnataka": 938,
+    "Andhra Pradesh": 840,
+    "West Bengal": 836,
+    "Chhattisgarh": 827,
+    "Madhya Pradesh": 809,
+    "Bihar": 795,
+    "Uttar Pradesh": 736,
+    "Tamil Nadu": 699,
+    "Maharashtra": 647,
+    "Assam": 639,
+    "Nagaland": 635,
+    "Uttarakhand": 634,
+    "Gujarat": 627,
+    "Himachal Pradesh": 607,
+    "Haryana": 589,
+    "Meghalaya": 576,
+    "Jammu And Kashmir": 566,
+    "Odisha": 522,
+    "Kerala": 469,
+    "Telangana": 464
+  },
+  "season_coverage": {
+    "Kharif": 8455,
+    "Rabi": 4212,
+    "Whole Year": 3636,
+    "Autumn": 384,
+    "Summer": 130,
+    "Winter": 56
+  },
+  "leakage_prevention": {
+    "target_leakage_checks_passed": true,
+    "features_restricted_to_prior_information": [
+      "State",
+      "Crop",
+      "Season",
+      "Area",
+      "Annual_Rainfall",
+      "Fertilizer",
+      "Pesticide"
+    ],
+    "excluded_from_features": [
+      "Production",
+      "Yield",
+      "Harvest_Date"
+    ]
+  }
+}

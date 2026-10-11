@@ -1,0 +1,16 @@
+{
+  "baseline": {
+    "name": "Hierarchical Historical Median Baseline",
+    "mae": 1.0933,
+    "rmse": 3.8273,
+    "r2": 0.9264
+  },
+  "ml_model": {
+    "name": "HistGradientBoostingRegressor",
+    "mae": 1.0715,
+    "rmse": 3.4837,
+    "r2": 0.939,
+    "beats_baseline": true,
+    "mae_improvement_pct": 2.0
+  }
+}

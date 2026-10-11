@@ -1,0 +1,41 @@
+{
+  "model_name": "HarvestWindow Yield Forecasting Engine",
+  "model_version": "1.0.0",
+  "trained_at": "2026-10-11T03:15:57.804994+00:00",
+  "algorithm": "HistGradientBoostingRegressor + AgronomicPrior",
+  "target_variable": "Yield (t/ha)",
+  "train_samples_count": 13498,
+  "test_samples_count": 3375,
+  "features": [
+    "Crop",
+    "State",
+    "Season",
+    "Area",
+    "Annual_Rainfall",
+    "Fertilizer",
+    "Pesticide",
+    "baseline_prior"
+  ],
+  "uncertainty_method": "CALIBRATED_RESIDUAL_PERCENTILES",
+  "confidence_level_pct": 80.0,
+  "residual_offsets": {
+    "p10": -0.8156,
+    "p90": 0.7953
+  },
+  "evaluation_metrics": {
+    "baseline": {
+      "name": "Hierarchical Historical Median Baseline",
+      "mae": 1.0933,
+      "rmse": 3.8273,
+      "r2": 0.9264
+    },
+    "ml_model": {
+      "name": "HistGradientBoostingRegressor",
+      "mae": 1.0715,
+      "rmse": 3.4837,
+      "r2": 0.939,
+      "beats_baseline": true,
+      "mae_improvement_pct": 2.0
+    }
+  }
+}

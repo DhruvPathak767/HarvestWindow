@@ -519,3 +519,4 @@ export interface AgriDataQuality {
 }
 
 export * from "./weatherRisk";
+export * from "./yieldPrediction";

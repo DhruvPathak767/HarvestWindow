@@ -301,3 +301,83 @@ The completion of Phase AI-1 satisfies all prerequisites for **Phase AI-2: Harve
 2. **Thermal-Time Benchmarks**: Base temperatures (`Tbase`), ceilings (`Tupper`), and GDD thresholds are structured in `agri_crop_growth_profiles`.
 3. **Database Normalization**: All agricultural entities are linked to foreign keys with indexed lookups on crop, region, and season.
 4. **API Foundation**: REST endpoints (`/api/v1/agriculture/*`) provide fast, paginated, and filtered access to agronomic parameters for both the prediction engine and the frontend UI.
+
+---
+
+## 10. Phase AI-5: Yield Forecasting and Production Estimation Engine
+
+Phase AI-5 provides crop yield forecasting per unit area (`tonnes/hectare`) and total expected farm production estimation (`metric tonnes`), integrating agricultural ML models, historical baselines, uncertainty quantification, Node.js REST APIs, and responsive frontend UI components.
+
+### 10.1 Prediction Objectives & Unit Discipline
+1. **Yield per unit area**: Canonical internal unit is Metric Tonnes per Hectare (`t/ha`). All models predict directly in `t/ha`.
+2. **Total farm production estimation**:
+   $$\text{expectedProductionTonnes} = \text{predictedYieldTonnesPerHectare} \times \text{plantedAreaHectares}$$
+   - Planted area is normalized to hectares using `convertToHectares` supporting `HECTARE`, `ACRE` (1 ha $\approx$ 2.47105 acres), `SQUARE_METRE` (10,000 sq m = 1 ha), and `BIGHA` (0.2508 ha regional default).
+3. **Uncertainty Quantification**: Calibrated 80% empirical residual interval ($P_{10} = -0.8156$, $P_{90} = +0.7953$ t/ha) derived from held-out validation predictions, clamped non-negatively:
+   $$\text{lowerProductionTonnes} = \max(0.01, \text{lowerYield}) \times \text{areaHectares}$$
+   $$\text{upperProductionTonnes} = \text{upperYield} \times \text{areaHectares}$$
+4. **Separation of Values**: The system strictly isolates:
+   - Predicted yield per hectare (`t/ha`)
+   - Estimated total production (`tonnes`)
+   - Historical baseline prior (`t/ha`)
+   - Actual harvested production recorded by farmers (`tonnes` or other units)
+
+### 10.2 Dataset Discovery & Audit
+- **Dataset**: `dhyann2815/india-crop-yield-prediction` (`AI/datasets/india_crop_yield.csv`)
+- **Rows**: 17,400 raw $\rightarrow$ 16,873 cleaned (96.97% retained).
+- **Features**: `Crop`, `Crop_Year`, `Season`, `State`, `Area`, `Production`, `Annual_Rainfall`, `Fertilizer`, `Pesticide`, `Yield`.
+- **Data Quality Audit**:
+  - Identified unit anomaly: Coconut was recorded in count of nuts (up to 21,105 nuts/ha) rather than metric tonnes. Excluded Coconut from weight-based regression to prevent severe target distortion.
+  - Cleaned yield distribution: Min = 0.0507 t/ha, Max = 197.0074 t/ha, Mean = 5.0957 t/ha, Median = 1.0928 t/ha across 59 crops, 31 states, and 6 seasons.
+  - Audit saved to `AI/reports/yield_dataset_audit.json`.
+
+### 10.3 Machine Learning Pipeline & Performance
+- **Baseline**: Hierarchical Historical Median Baseline (`Crop + State + Season` $\rightarrow$ `Crop + State` $\rightarrow$ `Crop` $\rightarrow$ ICAR official reference benchmark).
+- **ML Model**: `HistGradientBoostingRegressor` with `ColumnTransformer` (OneHotEncoder for categoricals, StandardScaler for numerics, and `baseline_prior` feature engineering).
+- **Hyperparameters**: `max_iter=300`, `learning_rate=0.08`, `max_depth=8`, `l2_regularization=0.1`.
+- **Split**: 80/20 train/test split (13,498 train samples, 3,375 test samples) stratified by major crops.
+- **Evaluation Results**:
+  | Metric | Hierarchical Median Baseline | HistGradientBoostingRegressor ML Model | Outcome |
+  |---|---|---|---|
+  | **MAE** | 1.0933 t/ha | **1.0715 t/ha** | **Beats baseline (2.0% MAE improvement)** |
+  | **RMSE** | 3.8273 t/ha | **3.4837 t/ha** | Improved by 9.0% |
+  | **$R^2$** | 0.9264 | **0.9390** | Explains 93.9% of yield variance |
+- **Artifacts**: Stored in `AI/yield_forecasting/artifacts/` (`yield_model.joblib`, `yield_baseline.joblib`, `yield_preprocessor.joblib`, `yield_model_metadata.json`).
+
+### 10.4 Node.js Backend & Prisma Integration
+- **Prisma Models**:
+  - `YieldPrediction`: Stores prediction snapshots with yield (`t/ha`), planted area, estimated production (`tonnes`), uncertainty bounds, prediction stage, confidence, model version, and data quality warnings.
+  - `ActualProduction`: Stores recorded actual harvest outputs separately without overwriting prediction records.
+- **REST Endpoints**:
+  - `POST /api/crops/:cropId/yield-prediction`: Predict yield and total production for crop.
+  - `POST /api/crops/:cropId/production-estimate`: Transparent custom area production calculation.
+  - `GET /api/crops/:cropId/yield-prediction`: Fetch latest cached prediction with staleness indicator.
+  - `POST /api/crops/:cropId/yield-prediction/refresh`: Force refresh prediction with latest field features.
+  - `POST /api/crops/:cropId/actual-production`: Record farmer-reported actual harvest output.
+  - `GET /api/farms/:farmId/production-estimates`: Farm-wide rollup of crop predictions, coverage, and total mass summary.
+- **Security**: Strict farm and crop ownership verification via JWT authentication; users cannot access other users' predictions or farms.
+
+### 10.5 Frontend Components
+- `YieldPredictionCard`: Complete visual card on crop details page showing yield, total production, confidence pill, prediction stage, uncertainty range, feature warnings, and refresh action.
+- `FarmProductionWidget`: Dashboard summary displaying eligible crops, predicted coverage, crop-wise breakdown bars, and total farm production mass.
+- `RecordActualProductionModal`: Clean dialog allowing farmers to input verified harvest quantity, harvest date, and notes.
+- `useYieldPrediction`: Typed React hook handling prediction fetch, refresh, and actual production mutation.
+
+### 10.6 Run and Test Commands
+```bash
+# 1. Dataset Audit
+python -m AI.yield_forecasting.data_validation
+
+# 2. Model Training & Evaluation
+python -m AI.yield_forecasting.train
+
+# 3. AI Pytest Suite (44 tests)
+python -m pytest AI/tests/
+
+# 4. Node.js Backend Test Suite (222 tests across 44 suites)
+cd backend && npm test
+
+# 5. Frontend Production Bundle Build
+cd frontend && npm run build
+```
+

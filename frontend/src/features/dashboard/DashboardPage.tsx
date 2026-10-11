@@ -37,6 +37,7 @@ import { formatDate, relativeTime } from "@/utils/date";
 import { formatArea, formatTemperature } from "@/utils/units";
 import { cn } from "@/utils/cn";
 import { CropStatusChart } from "./CropStatusChart";
+import { FarmProductionWidget } from "@/components/yield/FarmProductionWidget";
 
 type Filter = "all" | "approaching" | "in-window" | "attention";
 
@@ -619,6 +620,14 @@ export default function DashboardPage() {
           </Card>
         </section>
       )}
+
+      {/* Phase AI-5: Farm Production Forecast Widget */}
+      <section aria-label="Farm Production Forecast">
+        <FarmProductionWidget
+          farmId={activeFarm?.id || (farms.length > 0 ? farms[0].id : undefined)}
+          farmName={activeFarm?.name || (farms.length > 0 ? farms[0].name : undefined)}
+        />
+      </section>
 
       {/* C & D. Crop Status Distribution & Signature Harvest Window */}
       <section

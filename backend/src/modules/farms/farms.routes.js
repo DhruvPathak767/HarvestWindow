@@ -14,6 +14,7 @@ import {
   handleDeleteFarm,
 } from "./farms.controller.js";
 import { handleGetFarmWeatherRisk } from "../weather/weatherRisk.controller.js";
+import { getFarmProductionEstimatesHandler } from "../yield/yield.controller.js";
 
 const router = Router();
 
@@ -34,6 +35,13 @@ router.get(
   "/:farmId/weather-risk",
   validate(farmIdParamSchema, "params"),
   handleGetFarmWeatherRisk
+);
+
+// Phase AI-5 Farm-level Production Estimates
+router.get(
+  "/:farmId/production-estimates",
+  validate(farmIdParamSchema, "params"),
+  getFarmProductionEstimatesHandler
 );
 
 // D. Update a farm (support both PUT and PATCH)

@@ -18,6 +18,13 @@ import {
   handleGetCropWeatherRisk,
   handleRefreshCropWeatherRisk,
 } from "../weather/weatherRisk.controller.js";
+import {
+  predictCropYieldHandler,
+  estimateCropProductionHandler,
+  getLatestCropYieldHandler,
+  refreshCropYieldHandler,
+  recordActualProductionHandler,
+} from "../yield/yield.controller.js";
 
 const router = Router();
 
@@ -44,6 +51,37 @@ router.post(
   "/:cropId/weather-risk/refresh",
   validate(cropIdParamSchema, "params"),
   handleRefreshCropWeatherRisk
+);
+
+// Phase AI-5 Yield Forecasting & Production Estimation Engine
+router.post(
+  "/:cropId/yield-prediction",
+  validate(cropIdParamSchema, "params"),
+  predictCropYieldHandler
+);
+
+router.get(
+  "/:cropId/yield-prediction",
+  validate(cropIdParamSchema, "params"),
+  getLatestCropYieldHandler
+);
+
+router.post(
+  "/:cropId/yield-prediction/refresh",
+  validate(cropIdParamSchema, "params"),
+  refreshCropYieldHandler
+);
+
+router.post(
+  "/:cropId/production-estimate",
+  validate(cropIdParamSchema, "params"),
+  estimateCropProductionHandler
+);
+
+router.post(
+  "/:cropId/actual-production",
+  validate(cropIdParamSchema, "params"),
+  recordActualProductionHandler
 );
 
 // D. Update a crop (supports both PATCH and PUT)

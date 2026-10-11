@@ -19,6 +19,10 @@ import type {
   WeatherRiskAssessment,
   FarmWeatherRiskSummary,
   DashboardWeatherRiskSummary,
+  YieldPrediction,
+  ProductionEstimateResult,
+  FarmProductionSummary,
+  ActualHarvestProduction,
 } from "@/types";
 import {
   buildEmptySnapshot,
@@ -1598,6 +1602,128 @@ export const api: HarvestWindowApi = {
         return res.data;
       } catch (err) {
         console.warn("[HarvestWindow API] getDashboardWeatherRisk failed:", err);
+        throw err;
+      }
+    }
+    return null;
+  },
+
+  // ==========================================
+  // Phase AI-5: Yield Forecasting & Production Estimation API
+  // ==========================================
+
+  async getCropYieldPrediction(cropId: string): Promise<YieldPrediction | null> {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const res = await apiRequest<{ success: boolean; data: YieldPrediction }>(
+          `/crops/${cropId}/yield-prediction`
+        );
+        return res.data;
+      } catch (err) {
+        console.warn("[HarvestWindow API] getCropYieldPrediction failed:", err);
+        throw err;
+      }
+    }
+    return null;
+  },
+
+  async predictCropYield(
+    cropId: string,
+    overrides?: Record<string, unknown>
+  ): Promise<YieldPrediction | null> {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const res = await apiRequest<{ success: boolean; data: YieldPrediction }>(
+          `/crops/${cropId}/yield-prediction`,
+          {
+            method: "POST",
+            body: JSON.stringify(overrides || {}),
+          }
+        );
+        return res.data;
+      } catch (err) {
+        console.warn("[HarvestWindow API] predictCropYield failed:", err);
+        throw err;
+      }
+    }
+    return null;
+  },
+
+  async refreshCropYield(
+    cropId: string,
+    overrides?: Record<string, unknown>
+  ): Promise<YieldPrediction | null> {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const res = await apiRequest<{ success: boolean; data: YieldPrediction }>(
+          `/crops/${cropId}/yield-prediction/refresh`,
+          {
+            method: "POST",
+            body: JSON.stringify(overrides || {}),
+          }
+        );
+        return res.data;
+      } catch (err) {
+        console.warn("[HarvestWindow API] refreshCropYield failed:", err);
+        throw err;
+      }
+    }
+    return null;
+  },
+
+  async estimateCropProduction(
+    cropId: string,
+    data: { areaValue: number; areaUnit?: string; customYieldTonnesPerHectare?: number }
+  ): Promise<ProductionEstimateResult | null> {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const res = await apiRequest<{ success: boolean; data: ProductionEstimateResult }>(
+          `/crops/${cropId}/production-estimate`,
+          {
+            method: "POST",
+            body: JSON.stringify(data),
+          }
+        );
+        return res.data;
+      } catch (err) {
+        console.warn("[HarvestWindow API] estimateCropProduction failed:", err);
+        throw err;
+      }
+    }
+    return null;
+  },
+
+  async recordActualProduction(
+    cropId: string,
+    data: { quantity: number; unit?: string; harvestDate?: string; notes?: string }
+  ): Promise<ActualHarvestProduction | null> {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const res = await apiRequest<{ success: boolean; data: ActualHarvestProduction }>(
+          `/crops/${cropId}/actual-production`,
+          {
+            method: "POST",
+            body: JSON.stringify(data),
+          }
+        );
+        return res.data;
+      } catch (err) {
+        console.warn("[HarvestWindow API] recordActualProduction failed:", err);
+        throw err;
+      }
+    }
+    return null;
+  },
+
+  async getFarmProductionEstimates(farmId: string): Promise<FarmProductionSummary | null> {
+    if (API_CONFIG.mode === "live") {
+      try {
+        const res = await apiRequest<{ success: boolean; data: FarmProductionSummary }>(
+          `/farms/${farmId}/production-estimates`
+        );
+        return res.data;
+      } catch (err) {
+        console.warn("[HarvestWindow API] getFarmProductionEstimates failed:", err);
         throw err;
       }
     }

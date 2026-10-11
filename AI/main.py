@@ -21,6 +21,15 @@ from harvest_prediction.schemas import (
 from harvest_prediction.prediction_service import HarvestPredictionService
 from harvest_prediction.crop_knowledge import VERIFIED_CROP_KNOWLEDGE
 
+from yield_forecasting.schemas import (
+    YieldPredictionRequest,
+    YieldPredictionResponse,
+    ProductionEstimateRequest,
+    ProductionEstimateResponse
+)
+from yield_forecasting.predict import YieldPredictionService
+from yield_forecasting.production_estimator import estimate_total_production
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("harvest_prediction_api")
 
@@ -39,6 +48,7 @@ app.add_middleware(
 )
 
 service = HarvestPredictionService()
+yield_service = YieldPredictionService()
 AI_ROOT = os.path.dirname(os.path.abspath(__file__))
 REPORT_JSON_PATH = os.path.join(AI_ROOT, "data_suitability_report.json")
 ARTIFACTS_DIR = os.path.join(AI_ROOT, "harvest_prediction", "artifacts")
@@ -126,6 +136,73 @@ def get_data_readiness():
         "real_harvest_labels_in_csv": False,
         "data_audit": report_data,
         "supported_crops": DISTINCT_CROPS,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+# ============================================================================
+# Phase AI-5: Yield Forecasting and Production Estimation Endpoints
+# ============================================================================
+
+@app.post("/yield/predict", response_model=YieldPredictionResponse)
+def predict_crop_yield(request: YieldPredictionRequest):
+    try:
+        return yield_service.predict(request)
+    except Exception as exc:
+        logger.exception("Error executing yield prediction: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal yield prediction failure: {str(exc)}"
+        )
+
+@app.post("/yield/estimate-production", response_model=ProductionEstimateResponse)
+def estimate_production(request: ProductionEstimateRequest):
+    try:
+        from yield_forecasting.production_estimator import convert_to_hectares
+        area_ha = convert_to_hectares(request.planted_area.value, request.planted_area.unit)
+        prod_res = estimate_total_production(
+            predicted_yield_t_ha=request.predicted_yield_t_ha,
+            planted_area_value=request.planted_area.value,
+            planted_area_unit=request.planted_area.unit,
+            lower_yield_t_ha=request.lower_yield_t_ha,
+            upper_yield_t_ha=request.upper_yield_t_ha
+        )
+        from yield_forecasting.schemas import PlantedAreaResponse
+        return ProductionEstimateResponse(
+            crop_name=request.crop_name,
+            planted_area=PlantedAreaResponse(
+                original_value=float(request.planted_area.value),
+                original_unit=str(request.planted_area.unit).upper(),
+                area_hectares=area_ha
+            ),
+            predicted_yield_t_ha=request.predicted_yield_t_ha,
+            expected_production_tonnes=prod_res["expected_production_tonnes"],
+            lower_production_tonnes=prod_res["lower_production_tonnes"],
+            upper_production_tonnes=prod_res["upper_production_tonnes"],
+            area_hectares=area_ha
+        )
+    except Exception as exc:
+        logger.exception("Error estimating production: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Production estimation error: {str(exc)}"
+        )
+
+@app.get("/yield/metadata")
+def get_yield_model_metadata():
+    return {
+        "status": "ready",
+        "engine": "HarvestWindow Yield Forecasting Engine",
+        "version": "1.0.0",
+        "metadata": yield_service.metadata
+    }
+
+@app.get("/yield/health")
+def get_yield_health():
+    return {
+        "status": "healthy",
+        "service": "yield_forecasting_ai",
+        "model_loaded": yield_service.model is not None,
+        "baseline_loaded": yield_service.baseline is not None,
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
 

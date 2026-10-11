@@ -38,6 +38,7 @@ import { cn } from "@/utils/cn";
 import { api } from "@/services/api";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { WeatherRiskCard } from "@/components/weather/WeatherRiskCard";
+import { YieldPredictionCard } from "@/components/yield/YieldPredictionCard";
 import { useWeatherRisk } from "@/hooks/useWeatherRisk";
 
 export default function CropDetailPage() {
@@ -606,6 +607,14 @@ export default function CropDetailPage() {
           refreshing={weatherRiskRefreshing}
           error={weatherRiskError}
           onRefresh={refreshWeatherRisk}
+        />
+      </section>
+
+      {/* Phase AI-5 Yield Forecasting & Production Estimation Engine */}
+      <section aria-label="Yield Forecasting and Production Estimates">
+        <YieldPredictionCard
+          cropId={crop.id}
+          cropName={crop.name}
         />
       </section>
 
