@@ -20,6 +20,7 @@ import agricultureRoutes from "./modules/agriculture/agriculture.routes.js";
 import harvestPredictionRoutes from "./modules/forecasts/harvestPrediction.routes.js";
 import yieldRoutes from "./modules/yield/yield.routes.js";
 import cropHealthRoutes from "./modules/cropHealth/cropHealth.routes.js";
+import monitoringRoutes from "./modules/monitoring/monitoring.routes.js";
 
 export const app = express();
 
@@ -129,6 +130,12 @@ app.use("/api/v1/crop-health", cropHealthRoutes);
 app.use("/api/crop-health", cropHealthRoutes);
 app.use("/api/v1/ai/crop-health", cropHealthRoutes);
 app.use("/api/ai/crop-health", cropHealthRoutes);
+
+// Phase AI-9: Prediction Monitoring and Continuous Improvement
+app.use("/api/v1/ai/monitoring", monitoringRoutes);
+app.use("/api/ai/monitoring", monitoringRoutes);
+app.use("/api/v1/admin/ai/monitoring", monitoringRoutes);
+app.use("/api/admin/ai/monitoring", monitoringRoutes);
 
 // 404 Handler & Centralized Error Handler
 app.use(notFoundHandler);

@@ -27,6 +27,15 @@ import type {
   CropHealthPredictionResponse,
   CropHealthHistoryResponse,
   CropHealthStatusResponse,
+  HarvestOutcome,
+  PredictionEvaluation,
+  ModelAccuracySummary,
+  DriftAssessmentItem,
+  ModelRegistryResponse,
+  ModelEvaluationReportItem,
+  MonitoringJobItem,
+  RecordHarvestOutcomePayload,
+  UpdateHarvestOutcomePayload,
 } from "@/types";
 import {
   buildEmptySnapshot,
@@ -1827,6 +1836,104 @@ export const api: HarvestWindowApi = {
     const res = await apiRequest<{ success: boolean; data: CropHealthStatusResponse }>(
       `/ai/crop-health/status`
     );
+    return res.data;
+  },
+};
+
+/**
+ * Phase AI-9: Prediction Monitoring & Continuous Improvement API
+ */
+export const monitoringApi = {
+  async getAccuracySummary(filters?: { crop?: string; region?: string; modelVersion?: string }): Promise<ModelAccuracySummary> {
+    const q = new URLSearchParams();
+    if (filters?.crop) q.set("crop", filters.crop);
+    if (filters?.region) q.set("region", filters.region);
+    if (filters?.modelVersion) q.set("modelVersion", filters.modelVersion);
+    const qs = q.toString() ? `?${q.toString()}` : "";
+    const res = await apiRequest<{ success: boolean; data: ModelAccuracySummary }>(`/ai/monitoring/accuracy${qs}`);
+    return res.data;
+  },
+
+  async getErrors(params?: { crop?: string; region?: string; modelVersion?: string; page?: number; limit?: number }) {
+    const q = new URLSearchParams();
+    if (params?.crop) q.set("crop", params.crop);
+    if (params?.region) q.set("region", params.region);
+    if (params?.modelVersion) q.set("modelVersion", params.modelVersion);
+    if (params?.page) q.set("page", String(params.page));
+    if (params?.limit) q.set("limit", String(params.limit));
+    const qs = q.toString() ? `?${q.toString()}` : "";
+    const res = await apiRequest<{ success: boolean; data: { items: PredictionEvaluation[]; total: number; page: number; limit: number; totalPages: number } }>(`/ai/monitoring/errors${qs}`);
+    return res.data;
+  },
+
+  async getDriftStatus(): Promise<{ status: string; assessments: DriftAssessmentItem[] }> {
+    const res = await apiRequest<{ success: boolean; data: { status: string; assessments: DriftAssessmentItem[] } }>("/ai/monitoring/drift");
+    return res.data;
+  },
+
+  async getModelRegistry(): Promise<ModelRegistryResponse> {
+    const res = await apiRequest<{ success: boolean; data: ModelRegistryResponse }>("/ai/monitoring/models");
+    return res.data;
+  },
+
+  async getReports(params?: { page?: number; limit?: number }) {
+    const q = new URLSearchParams();
+    if (params?.page) q.set("page", String(params.page));
+    if (params?.limit) q.set("limit", String(params.limit));
+    const qs = q.toString() ? `?${q.toString()}` : "";
+    const res = await apiRequest<{ success: boolean; data: { reports: ModelEvaluationReportItem[]; total: number; page: number; totalPages: number } }>(`/ai/monitoring/reports${qs}`);
+    return res.data;
+  },
+
+  async getMonitoringJobs(params?: { page?: number; limit?: number }) {
+    const q = new URLSearchParams();
+    if (params?.page) q.set("page", String(params.page));
+    if (params?.limit) q.set("limit", String(params.limit));
+    const qs = q.toString() ? `?${q.toString()}` : "";
+    const res = await apiRequest<{ success: boolean; data: { jobs: MonitoringJobItem[]; total: number; page: number; totalPages: number } }>(`/admin/ai/monitoring/jobs${qs}`);
+    return res.data;
+  },
+
+  async triggerEvaluation() {
+    const res = await apiRequest<{ success: boolean; message: string; data: any }>("/admin/ai/monitoring/evaluate", {
+      method: "POST",
+    });
+    return res.data;
+  },
+
+  async triggerRetrainingCheck() {
+    const res = await apiRequest<{ success: boolean; message: string; data: any }>("/admin/ai/monitoring/retrain-check", {
+      method: "POST",
+    });
+    return res.data;
+  },
+
+  async promoteModel(payload: { modelName?: string; modelVersion: string }) {
+    const res = await apiRequest<{ success: boolean; message: string; data: any }>("/admin/ai/monitoring/promote", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    return res.data;
+  },
+
+  async recordCropHarvestOutcome(cropId: string, payload: RecordHarvestOutcomePayload): Promise<HarvestOutcome> {
+    const res = await apiRequest<{ success: boolean; message: string; data: HarvestOutcome }>(`/crops/${cropId}/harvest-outcomes`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    return res.data;
+  },
+
+  async getCropHarvestOutcomes(cropId: string): Promise<HarvestOutcome[]> {
+    const res = await apiRequest<{ success: boolean; data: HarvestOutcome[] }>(`/crops/${cropId}/harvest-outcomes`);
+    return res.data;
+  },
+
+  async updateCropHarvestOutcome(cropId: string, outcomeId: string, payload: UpdateHarvestOutcomePayload): Promise<HarvestOutcome> {
+    const res = await apiRequest<{ success: boolean; message: string; data: HarvestOutcome }>(`/crops/${cropId}/harvest-outcomes/${outcomeId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
     return res.data;
   },
 };

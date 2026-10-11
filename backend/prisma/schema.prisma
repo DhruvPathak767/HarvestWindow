@@ -41,6 +41,7 @@ model User {
   yieldPredictions   YieldPrediction[]
   actualProductions  ActualProduction[]
   cropHealthAnalyses CropHealthAnalysis[]
+  harvestOutcomes    HarvestOutcome[]
 
   @@index([role])
   @@map("users")
@@ -93,6 +94,7 @@ model Farm {
   yieldPredictions       YieldPrediction[]
   actualProductions      ActualProduction[]
   cropHealthAnalyses     CropHealthAnalysis[]
+  harvestOutcomes        HarvestOutcome[]
 
   @@index([userId])
   @@map("farms")
@@ -146,6 +148,7 @@ model Crop {
   yieldPredictions    YieldPrediction[]
   actualProductions   ActualProduction[]
   cropHealthAnalyses  CropHealthAnalysis[]
+  harvestOutcomes     HarvestOutcome[]
 
   @@index([farmId])
   @@index([cropName])
@@ -545,6 +548,8 @@ model HarvestPrediction {
   user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   farm                  Farm      @relation(fields: [farmId], references: [id], onDelete: Cascade)
   crop                  Crop      @relation(fields: [cropId], references: [id], onDelete: Cascade)
+  harvestOutcomes       HarvestOutcome[]
+  evaluations           PredictionEvaluation[]
 
   @@index([userId, cropId])
   @@index([cropId, predictionDate])
@@ -691,6 +696,193 @@ model CropHealthAnalysis {
   @@index([farmId])
   @@map("crop_health_analyses")
 }
+
+// ==========================================
+// Phase AI-9: Prediction Monitoring and Continuous Improvement Models
+// ==========================================
+model HarvestOutcome {
+  id                  String    @id @default(cuid())
+  userId              String    @db.VarChar(191)
+  farmId              String    @db.VarChar(191)
+  cropId              String    @db.VarChar(191)
+  predictionId        String?   @db.VarChar(191)
+  actualHarvestDate   DateTime
+  actualHarvestStart  DateTime?
+  actualHarvestEnd    DateTime?
+  season              String?   @db.VarChar(50)
+  outcomeSource       String    @default("FARMER_RECORDED") @db.VarChar(50) // "FARMER_RECORDED" | "INSPECTOR_VERIFIED" | "REMOTE_SENSED" | "HISTORICAL_RECORD"
+  verificationStatus  String    @default("PENDING_VERIFICATION") @db.VarChar(40) // "PENDING_VERIFICATION" | "VERIFIED" | "REJECTED" | "CORRECTED"
+  verifiedAt          DateTime?
+  verifiedByUserId    String?   @db.VarChar(191)
+  verificationNotes   String?   @db.Text
+  consentEvaluation   Boolean   @default(true)
+  consentTraining     Boolean   @default(false)
+  notes               String?   @db.Text
+  correctionCount     Int       @default(0)
+  previousOutcomeJson String?   @db.Text
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  farm                Farm                @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  crop                Crop                @relation(fields: [cropId], references: [id], onDelete: Cascade)
+  prediction          HarvestPrediction?  @relation(fields: [predictionId], references: [id], onDelete: SetNull)
+  evaluations         PredictionEvaluation[]
+
+  @@index([userId, cropId])
+  @@index([farmId])
+  @@index([cropId, actualHarvestDate])
+  @@index([verificationStatus])
+  @@index([predictionId])
+  @@map("harvest_outcomes")
+}
+
+model PredictionEvaluation {
+  id                    String    @id @default(cuid())
+  outcomeId             String    @db.VarChar(191)
+  predictionId          String    @db.VarChar(191)
+  cropId                String    @db.VarChar(191)
+  farmId                String    @db.VarChar(191)
+  modelVersion          String    @db.VarChar(60)
+  modelName             String    @default("HarvestWindow-Predictor") @db.VarChar(100)
+  actualHarvestDate     DateTime
+  predictedHarvestDate  DateTime
+  predictedWindowStart  DateTime?
+  predictedWindowEnd    DateTime?
+  errorDays             Int       // actual - predicted: positive = late, negative = early
+  absoluteErrorDays     Int
+  isExactDate           Boolean   @default(false)
+  isWithin3Days         Boolean   @default(false)
+  isWithin7Days         Boolean   @default(false)
+  isWithinWindow        Boolean?
+  windowDistanceDays    Int?      // distance to nearest boundary if outside
+  forecastHorizonDays   Int?      // days between prediction generation and actual harvest
+  evaluationRevision    Int       @default(1)
+  isEligibleForTraining Boolean   @default(false)
+  exclusionReason       String?   @db.VarChar(150)
+  calculatedAt          DateTime  @default(now())
+
+  outcome               HarvestOutcome    @relation(fields: [outcomeId], references: [id], onDelete: Cascade)
+  prediction            HarvestPrediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
+
+  @@unique([outcomeId, predictionId, evaluationRevision])
+  @@index([cropId])
+  @@index([farmId])
+  @@index([modelVersion])
+  @@index([calculatedAt])
+  @@map("prediction_evaluations")
+}
+
+model ModelEvaluationReport {
+  id                    String    @id @default(cuid())
+  reportId              String    @unique @db.VarChar(100)
+  modelVersion          String    @db.VarChar(60)
+  modelName             String    @default("HarvestWindow-Predictor") @db.VarChar(100)
+  evaluationPeriodStart DateTime?
+  evaluationPeriodEnd   DateTime?
+  cropFilter            String?   @db.VarChar(100)
+  regionFilter          String?   @db.VarChar(100)
+  seasonFilter          String?   @db.VarChar(50)
+  totalEvaluated        Int       @default(0)
+  eligibleCount         Int       @default(0)
+  excludedCount         Int       @default(0)
+  meanAbsoluteError     Decimal?  @db.Decimal(8, 3)
+  meanSignedError       Decimal?  @db.Decimal(8, 3) // Bias
+  rootMeanSquaredError  Decimal?  @db.Decimal(8, 3)
+  exactDateAccuracyPct  Decimal?  @db.Decimal(6, 2)
+  within3DaysPct        Decimal?  @db.Decimal(6, 2)
+  within7DaysPct        Decimal?  @db.Decimal(6, 2)
+  windowCoveragePct     Decimal?  @db.Decimal(6, 2)
+  meanWindowDistance    Decimal?  @db.Decimal(8, 3)
+  isInsufficientData    Boolean   @default(false)
+  subgroupsJson         String?   @db.LongText // crop, region, horizon breakdowns
+  warningsJson          String?   @db.Text
+  generatedBy           String    @default("SCHEDULED_JOB") @db.VarChar(50)
+  schemaVersion         String    @default("1.0.0") @db.VarChar(20)
+  createdAt             DateTime  @default(now())
+
+  @@index([modelVersion])
+  @@index([createdAt])
+  @@index([cropFilter])
+  @@index([regionFilter])
+  @@map("model_evaluation_reports")
+}
+
+model DriftAssessment {
+  id                   String    @id @default(cuid())
+  assessmentId         String    @unique @db.VarChar(100)
+  modelVersion         String    @db.VarChar(60)
+  driftType            String    @db.VarChar(50) // "INPUT_DATA_DRIFT" | "PERFORMANCE_DRIFT" | "PREDICTION_DRIFT"
+  severity             String    @default("NORMAL") @db.VarChar(30) // "NORMAL" | "WATCH" | "WARNING" | "CRITICAL" | "INSUFFICIENT_DATA"
+  referencePeriodStart DateTime?
+  referencePeriodEnd   DateTime?
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  referenceSampleSize  Int       @default(0)
+  currentSampleSize    Int       @default(0)
+  featuresCheckedJson  String?   @db.Text
+  statisticalMethod    String    @db.VarChar(100) // "PSI_AND_KS_TEST" | "ROLLING_ERROR_SPIKE"
+  driftScore           Decimal?  @db.Decimal(8, 4)
+  threshold            Decimal?  @db.Decimal(8, 4)
+  summaryDetailsJson   String?   @db.LongText
+  recommendations      String?   @db.Text
+  createdAt            DateTime  @default(now())
+
+  @@index([modelVersion])
+  @@index([driftType])
+  @@index([severity])
+  @@index([createdAt])
+  @@map("drift_assessments")
+}
+
+model ModelVersionRegistry {
+  id                  String    @id @default(cuid())
+  modelName           String    @db.VarChar(100)
+  modelVersion        String    @db.VarChar(60)
+  trainingRunId       String?   @db.VarChar(100)
+  experimentName      String?   @db.VarChar(100)
+  datasetReference    String?   @db.VarChar(255)
+  datasetFingerprint  String?   @db.VarChar(64)
+  featureSchemaVer    String    @default("1.0.0") @db.VarChar(30)
+  algorithm           String    @default("AgronomicGDDHybrid") @db.VarChar(100)
+  hyperparametersJson String?   @db.Text
+  validationMae       Decimal?  @db.Decimal(8, 3)
+  validationRmse      Decimal?  @db.Decimal(8, 3)
+  validationBias      Decimal?  @db.Decimal(8, 3)
+  promotionStatus     String    @default("CANDIDATE") @db.VarChar(40) // "CANDIDATE" | "VALIDATED" | "ACTIVE_PRODUCTION" | "DEPRECATED" | "REJECTED"
+  rejectionReason     String?   @db.Text
+  isActive            Boolean   @default(false)
+  promotedAt          DateTime?
+  promotedByUserId    String?   @db.VarChar(191)
+  artifactPath        String?   @db.VarChar(255)
+  artifactChecksum    String?   @db.VarChar(64)
+  notes               String?   @db.Text
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@unique([modelName, modelVersion])
+  @@index([modelName, isActive])
+  @@index([promotionStatus])
+  @@map("model_version_registry")
+}
+
+model MonitoringJobRun {
+  id                 String    @id @default(cuid())
+  jobType            String    @db.VarChar(60) // "OUTCOME_EVALUATION" | "PERFORMANCE_REPORT" | "DRIFT_MONITORING" | "RETRAINING_ELIGIBILITY" | "CANDIDATE_TRAINING" | "CANDIDATE_VALIDATION"
+  status             String    @default("PENDING") @db.VarChar(30) // "PENDING" | "RUNNING" | "COMPLETED" | "FAILED" | "SKIPPED"
+  startedAt          DateTime  @default(now())
+  completedAt        DateTime?
+  recordsProcessed   Int       @default(0)
+  resultsSummaryJson String?   @db.Text
+  errorMessage       String?   @db.Text
+  triggeredBy        String    @default("SCHEDULED") @db.VarChar(50) // "SCHEDULED" | "MANUAL_ADMIN" | "EVENT_DRIVEN"
+  createdAt          DateTime  @default(now())
+
+  @@index([jobType, status])
+  @@index([startedAt])
+  @@map("monitoring_job_runs")
+}
+
 
 
 

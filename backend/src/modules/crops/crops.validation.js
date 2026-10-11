@@ -78,6 +78,11 @@ export const cropIdParamSchema = z.object({
   cropId: z.string().trim().min(1, "Crop ID is required"),
 });
 
+export const cropAndOutcomeIdParamSchema = z.object({
+  cropId: z.string().trim().min(1, "Crop ID is required"),
+  outcomeId: z.string().trim().min(1, "Outcome ID is required"),
+});
+
 /**
  * Validates query parameters for listing crops.
  */

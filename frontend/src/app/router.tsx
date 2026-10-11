@@ -20,6 +20,9 @@ const RecommendationsPage = lazy(
   () => import("@/features/recommendations/RecommendationsPage")
 );
 const SettingsPage = lazy(() => import("@/features/settings/SettingsPage"));
+const MonitoringDashboardPage = lazy(
+  () => import("@/features/monitoring/MonitoringDashboardPage")
+);
 
 function RouteFallback() {
   return (
@@ -77,6 +80,7 @@ export function AppRoutes() {
               <Route path="weather" element={<WeatherPage />} />
               <Route path="recommendations" element={<RecommendationsPage />} />
               <Route path="settings" element={<SettingsPage />} />
+              <Route path="monitoring" element={<MonitoringDashboardPage />} />
             </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

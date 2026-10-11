@@ -35,12 +35,15 @@ import { AgronomicKnowledgeCard } from "./AgronomicKnowledgeCard";
 import { weatherService, CONDITION_LABEL } from "@/services/weather/weatherService";
 import { daysLabel, formatDate, formatTime, relativeTime } from "@/utils/date";
 import { cn } from "@/utils/cn";
-import { api } from "@/services/api";
+import { api, monitoringApi } from "@/services/api";
 import { useToast } from "@/components/feedback/ToastProvider";
 import { WeatherRiskCard } from "@/components/weather/WeatherRiskCard";
 import { YieldPredictionCard } from "@/components/yield/YieldPredictionCard";
 import { CropHealthSection } from "@/components/cropHealth/CropHealthSection";
+import { HarvestOutcomeHistoryCard } from "@/components/monitoring/HarvestOutcomeHistoryCard";
+import { RecordHarvestOutcomeModal } from "@/components/monitoring/RecordHarvestOutcomeModal";
 import { useWeatherRisk } from "@/hooks/useWeatherRisk";
+import { HarvestOutcome, RecordHarvestOutcomePayload, UpdateHarvestOutcomePayload } from "@/types";
 
 export default function CropDetailPage() {
   const { cropId } = useParams<{ cropId: string }>();
@@ -76,6 +79,50 @@ export default function CropDetailPage() {
     error: weatherRiskError,
     refresh: refreshWeatherRisk,
   } = useWeatherRisk(crop?.id);
+
+  // Phase AI-9 Harvest Outcome states
+  const [outcomeModalOpen, setOutcomeModalOpen] = useState(false);
+  const [harvestOutcomes, setHarvestOutcomes] = useState<HarvestOutcome[]>([]);
+  const [outcomesLoading, setOutcomesLoading] = useState(false);
+
+  const loadHarvestOutcomes = async () => {
+    if (!cropId) return;
+    setOutcomesLoading(true);
+    try {
+      const list = await monitoringApi.getCropHarvestOutcomes(cropId);
+      setHarvestOutcomes(list);
+    } catch (err) {
+      console.error("Failed to load harvest outcomes:", err);
+    } finally {
+      setOutcomesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (cropId) {
+      loadHarvestOutcomes();
+    }
+  }, [cropId]);
+
+  const handleRecordOutcome = async (payload: RecordHarvestOutcomePayload) => {
+    if (!cropId) return;
+    await monitoringApi.recordCropHarvestOutcome(cropId, payload);
+    toast({
+      title: "Harvest Outcome Recorded",
+      description: "Actual harvest date recorded and evaluation metrics calculated.",
+    });
+    await loadHarvestOutcomes();
+  };
+
+  const handleUpdateOutcome = async (outcomeId: string, payload: UpdateHarvestOutcomePayload) => {
+    if (!cropId) return;
+    await monitoringApi.updateCropHarvestOutcome(cropId, outcomeId, payload);
+    toast({
+      title: "Outcome Updated",
+      description: "Harvest record and prediction error recalculated.",
+    });
+    await loadHarvestOutcomes();
+  };
 
   useEffect(() => {
     if (cropId) {
@@ -627,6 +674,35 @@ export default function CropDetailPage() {
         />
       </section>
 
+      {/* Phase AI-9 Verified Actual Harvest Outcomes & Prediction Monitoring */}
+      <section aria-label="Actual Harvest Outcomes and Continuous Improvement">
+        <Card>
+          <CardHeader
+            title="Verified Actual Harvest Outcomes"
+            subtitle="Closed-loop verification of actual harvest dates to measure model prediction accuracy and monitor continuous improvement."
+            icon={<CheckCircle2 className="h-4 w-4 text-emerald-500" aria-hidden />}
+            action={
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setOutcomeModalOpen(true)}
+                className="text-xs flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-500 text-white"
+              >
+                <CalendarRange className="w-3.5 h-3.5" />
+                <span>Record Actual Harvest</span>
+              </Button>
+            }
+          />
+          <div className="p-5">
+            <HarvestOutcomeHistoryCard
+              outcomes={harvestOutcomes}
+              loading={outcomesLoading}
+              onUpdateOutcome={handleUpdateOutcome}
+            />
+          </div>
+        </Card>
+      </section>
+
       {/* Verified Agronomic Knowledge Base (Phase AI-1) */}
       <section aria-label="Agronomic Knowledge Base">
         <AgronomicKnowledgeCard
@@ -866,6 +942,15 @@ export default function CropDetailPage() {
           )}
         </div>
       </Modal>
+
+      {/* Phase AI-9 Outcome Recording Modal */}
+      <RecordHarvestOutcomeModal
+        isOpen={outcomeModalOpen}
+        onClose={() => setOutcomeModalOpen(false)}
+        onSubmit={handleRecordOutcome}
+        cropName={crop.name}
+        predictedHarvestDate={forecast?.targetDate || liveAiPrediction?.mostLikelyHarvestDate}
+      />
     </div>
   );
 }

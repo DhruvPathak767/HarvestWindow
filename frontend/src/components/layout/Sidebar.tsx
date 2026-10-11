@@ -25,6 +25,7 @@ const NAV = [
   { to: "/app/farms", label: "My Farms", icon: Map },
   { to: "/app/crop-health", label: "Crop Health", icon: ShieldAlert },
   { to: "/app/forecast", label: "Harvest Forecast", icon: BarChart3 },
+  { to: "/app/monitoring", label: "Model Monitoring", icon: Activity },
   { to: "/app/weather", label: "Weather", icon: CloudSun },
   { to: "/app/recommendations", label: "Recommendations", icon: ListChecks },
   { to: "/app/settings", label: "Settings", icon: SettingsIcon },

@@ -280,7 +280,127 @@ async def predict_crop_health(
             detail=f"Inference error: {str(exc)}"
         )
 
+
+# ============================================================================
+# Phase AI-9: Prediction Monitoring and Continuous Improvement Endpoints
+# ============================================================================
+from monitoring.schemas import (
+    BatchEvaluationRequest,
+    BatchEvaluationResponse,
+    DriftAnalysisRequest,
+    DriftAnalysisResponse,
+    PerformanceDriftRequest,
+    RetrainingEligibilityCheckRequest,
+    RetrainingEligibilityResponse,
+    CandidateComparisonResponse
+)
+from monitoring.evaluator import run_batch_evaluation
+from monitoring.drift_detector import analyze_input_data_drift, analyze_performance_drift
+from monitoring.retraining_policy import evaluate_retraining_eligibility
+from monitoring.candidate_trainer import candidate_trainer
+from monitoring.mlflow_tracker import tracker
+
+@app.get("/monitoring/health")
+def monitoring_health():
+    return {
+        "status": "healthy",
+        "service": "prediction_monitoring_ai",
+        "mlflow_tracking_uri": tracker.tracking_uri,
+        "experiment_name": tracker.experiment_name,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+@app.post("/monitoring/evaluate", response_model=BatchEvaluationResponse)
+def evaluate_predictions(request: BatchEvaluationRequest):
+    try:
+        return run_batch_evaluation(request)
+    except Exception as exc:
+        logger.exception("Prediction evaluation error: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Evaluation execution failure: {str(exc)}"
+        )
+
+@app.post("/monitoring/drift/input", response_model=DriftAnalysisResponse)
+def check_input_drift(request: DriftAnalysisRequest):
+    try:
+        return analyze_input_data_drift(
+            reference_records=request.reference_records,
+            current_records=request.current_records,
+            features_to_check=request.features_to_check,
+            model_version=request.model_version or "2.0.0-agronomic-gdd-weather"
+        )
+    except Exception as exc:
+        logger.exception("Input drift analysis error: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Input drift check failure: {str(exc)}"
+        )
+
+@app.post("/monitoring/drift/performance", response_model=DriftAnalysisResponse)
+def check_performance_drift(request: PerformanceDriftRequest):
+    try:
+        return analyze_performance_drift(
+            baseline_evaluations=request.baseline_evaluations,
+            current_evaluations=request.current_evaluations,
+            model_version=request.model_version or "2.0.0-agronomic-gdd-weather"
+        )
+    except Exception as exc:
+        logger.exception("Performance drift analysis error: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Performance drift check failure: {str(exc)}"
+        )
+
+@app.post("/monitoring/retraining/check", response_model=RetrainingEligibilityResponse)
+def check_retraining_eligibility(request: RetrainingEligibilityCheckRequest):
+    try:
+        return evaluate_retraining_eligibility(
+            verified_outcomes_count=request.verified_outcomes_count,
+            training_consented_count=request.training_consented_count,
+            current_dataset_fingerprint=request.current_dataset_fingerprint,
+            last_trained_dataset_fingerprint=request.last_trained_dataset_fingerprint,
+            recent_drift_severity=request.recent_drift_severity,
+            days_since_last_training=request.days_since_last_training,
+            crop_diversity_count=request.crop_diversity_count,
+            region_diversity_count=request.region_diversity_count
+        )
+    except Exception as exc:
+        logger.exception("Retraining eligibility check error: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Eligibility evaluation failure: {str(exc)}"
+        )
+
+@app.post("/monitoring/retraining/train-candidate", response_model=CandidateComparisonResponse)
+def train_candidate_model(request: BatchEvaluationRequest):
+    try:
+        return candidate_trainer.train_and_evaluate_candidate(
+            consented_pairs=request.pairs
+        )
+    except Exception as exc:
+        logger.exception("Candidate training failure: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Candidate training failed: {str(exc)}"
+        )
+
+@app.get("/monitoring/mlflow/runs")
+def get_mlflow_runs():
+    try:
+        return {
+            "status": "success",
+            "runs": tracker.list_recent_runs(max_results=15)
+        }
+    except Exception as exc:
+        logger.exception("MLflow runs retrieval error: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Could not retrieve MLflow runs: {str(exc)}"
+        )
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)
+
 

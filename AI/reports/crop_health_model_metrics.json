@@ -2,15 +2,15 @@
   "model_metadata": {
     "model_name": "HarvestWindow Crop Disease & Health Detection Engine",
     "model_version": "1.0.0",
-    "trained_at": "2026-10-11T04:03:24.118183+00:00",
+    "trained_at": "2026-10-11T04:53:55.647836+00:00",
     "architecture": "MobileNetV3-Small (Transfer Learning)",
     "framework": "PyTorch 2.14 / Torchvision 0.29",
     "num_classes": 25,
     "input_dimensions": "224x224x3",
-    "training_samples": 240,
-    "validation_samples": 30,
-    "test_samples": 30,
-    "training_duration_seconds": 79.0,
+    "training_samples": 800,
+    "validation_samples": 100,
+    "test_samples": 100,
+    "training_duration_seconds": 123.7,
     "supported_crops": [
       "Potato",
       "Tomato",
@@ -19,23 +19,23 @@
       "Apple"
     ],
     "evaluation_metrics": {
-      "test_samples_count": 30,
-      "test_accuracy": 0.6,
-      "macro_precision": 0.5633,
-      "macro_recall": 0.62,
-      "macro_f1": 0.5693,
-      "mean_inference_latency_ms": 6.68,
+      "test_samples_count": 100,
+      "test_accuracy": 0.84,
+      "macro_precision": 0.8477,
+      "macro_recall": 0.84,
+      "macro_f1": 0.8284,
+      "mean_inference_latency_ms": 5.92,
       "model_artifact_size_mb": 6.01
     },
-    "readiness_status": "LIMITED"
+    "readiness_status": "READY"
   },
   "metrics": {
-    "test_samples_count": 30,
-    "test_accuracy": 0.6,
-    "macro_precision": 0.5633,
-    "macro_recall": 0.62,
-    "macro_f1": 0.5693,
-    "mean_inference_latency_ms": 6.68,
+    "test_samples_count": 100,
+    "test_accuracy": 0.84,
+    "macro_precision": 0.8477,
+    "macro_recall": 0.84,
+    "macro_f1": 0.8284,
+    "mean_inference_latency_ms": 5.92,
     "model_artifact_size_mb": 6.01
   }
 }

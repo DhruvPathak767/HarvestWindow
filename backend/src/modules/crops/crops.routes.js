@@ -3,6 +3,7 @@ import { authenticate } from "../../middleware/authenticate.js";
 import { validate } from "../../middleware/validate.js";
 import {
   cropIdParamSchema,
+  cropAndOutcomeIdParamSchema,
   listCropsQuerySchema,
   createCropSchema,
   updateCropSchema,
@@ -30,6 +31,11 @@ import {
   getUserHistory,
 } from "../cropHealth/cropHealth.controller.js";
 import { uploadImageMiddleware } from "../cropHealth/cropHealth.service.js";
+import {
+  recordOutcomeHandler,
+  getCropOutcomesHandler,
+  updateOutcomeHandler,
+} from "../monitoring/monitoring.controller.js";
 
 const router = Router();
 
@@ -105,6 +111,25 @@ router.get(
     req.query.cropId = req.params.cropId;
     return getUserHistory(req, res, next);
   }
+);
+
+// Phase AI-9 Prediction Monitoring & Continuous Improvement: Harvest Outcomes
+router.post(
+  "/:cropId/harvest-outcomes",
+  validate(cropIdParamSchema, "params"),
+  recordOutcomeHandler
+);
+
+router.get(
+  "/:cropId/harvest-outcomes",
+  validate(cropIdParamSchema, "params"),
+  getCropOutcomesHandler
+);
+
+router.put(
+  "/:cropId/harvest-outcomes/:outcomeId",
+  validate(cropAndOutcomeIdParamSchema, "params"),
+  updateOutcomeHandler
 );
 
 // D. Update a crop (supports both PATCH and PUT)
