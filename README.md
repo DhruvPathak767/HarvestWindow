@@ -1,155 +1,171 @@
+# 🌾 HarvestWindow — Enterprise Agricultural Intelligence Platform
+
 <p align="center">
-  <img src="docs/assets/banner.svg" alt="HarvestWindow Animated Enterprise Banner" width="100%" />
+  <img src="docs/assets/banner.svg" alt="HarvestWindow Enterprise Banner" width="100%" />
 </p>
 
 <p align="center">
   <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-v20+-339933?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Node.js" /></a>
   <a href="https://expressjs.com/"><img src="https://img.shields.io/badge/Express-v4.19-000000?style=for-the-badge&logo=express&logoColor=white" alt="Express.js" /></a>
+  <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/FastAPI-v0.110-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" /></a>
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-v3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python" /></a>
   <a href="https://react.dev/"><img src="https://img.shields.io/badge/React-v19.0-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React 19" /></a>
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-v5.7-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" /></a>
-  <a href="https://vite.dev/"><img src="https://img.shields.io/badge/Vite-v7.3-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite" /></a>
   <a href="https://www.mysql.com/"><img src="https://img.shields.io/badge/MySQL-8.0+-4479A1?style=for-the-badge&logo=mysql&logoColor=white" alt="MySQL" /></a>
   <a href="https://www.prisma.io/"><img src="https://img.shields.io/badge/Prisma_ORM-v6.19-2D3748?style=for-the-badge&logo=prisma&logoColor=white" alt="Prisma" /></a>
-  <a href="https://cloud.google.com/vertex-ai"><img src="https://img.shields.io/badge/Google_Gemini-Ready-8E75C4?style=for-the-badge&logo=googlegemini&logoColor=white" alt="Gemini" /></a>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Automated_Tests-180%2B%20PASSED%20(100%25)-10B981?style=flat-square&logo=checkmarx&logoColor=white" alt="Tests Passed" />
-  <img src="https://img.shields.io/badge/AI_Engine-Zero--Cost_Agronomic_Synthesis-059669?style=flat-square" alt="Zero Cost AI" />
+  <img src="https://img.shields.io/badge/Full_System_Status-PRODUCTION_READY-059669?style=flat-square" alt="System Ready" />
+  <img src="https://img.shields.io/badge/Architecture-Dual_Tier_(Node%20%2B%20Python)-0284C7?style=flat-square" alt="Dual Tier Architecture" />
   <img src="https://img.shields.io/badge/Knowledge_Grounding-FAO_%2B_ICAR_%2B_IISS-047857?style=flat-square" alt="FAO/ICAR Grounded" />
-  <img src="https://img.shields.io/badge/Weather-Dual_Horizon_(Open--Meteo_%2B_WeatherAPI)-0284C7?style=flat-square" alt="Weather Dual Engine" />
+  <img src="https://img.shields.io/badge/AI_Inference-Zero--Cost_Local_Synthesis-8B5CF6?style=flat-square" alt="Zero-Cost AI" />
   <img src="https://img.shields.io/badge/Security-Multi--Tenant_RBAC-4338CA?style=flat-square" alt="Multi Tenant" />
-  <img src="https://img.shields.io/badge/License-MIT-F59E0B?style=flat-square" alt="MIT License" />
 </p>
 
 ---
 
-## 🌾 Executive Summary
+## 📖 Executive Summary & Mission
 
-**HarvestWindow** is an enterprise-grade agricultural intelligence and decision-support platform engineered to solve the most financially volatile problem in agriculture: **harvest timing uncertainty and post-harvest crop loss**.
+**HarvestWindow** is an end-to-end full-stack agricultural decision-support and precision harvest forecasting platform engineered for Indian farmers, agricultural cooperatives, and agronomic institutions.
 
-Timing a harvest even 3 to 5 days prematurely or belatedly causes catastrophic losses—immature grain moisture content triggers pod shattering and fungal decay, while unexpected precipitation during harvesting shatters market prices. 
+Harvest timing uncertainty causes billions of dollars in annual agricultural losses. Harvesting too early results in underdeveloped grain and moisture rejection at market mandis; harvesting too late exposes mature crops to lodging, pod shattering, pests, and unseasonal rainfall.
 
-HarvestWindow unifies **10-day dual microclimate meteorological intelligence**, **phenological Growing Degree Day (GDD) modeling**, **soil and variety dynamics**, **supervised machine learning yield regressors**, **computer vision leaf disease detection**, and an **authoritative RAG Agricultural AI Assistant with deterministic personalized alerts**.
-
-> [!IMPORTANT]
-> **Zero-Cost & Anti-Hallucination Philosophy**:
-> Unlike naive LLM wrappers that hallucinate weather numbers and farming dates, HarvestWindow operates on a **strictly grounded, server-controlled architecture**. The system ships with a high-precision, zero-cost **Local Agronomic Synthesis Engine** that requires **no external paid API keys or cloud tokens**. Farm context and citations are verified against peer-reviewed **ICAR, FAO, IISS, and PAU** reference benchmarks.
+HarvestWindow bridges this gap by unifying:
+1. **Multi-Tenant Farm & Crop Lifecycle Management** (Tracking soil chemistry, sowing dates, and phenological development stages).
+2. **Dual-Horizon Meteorological Intelligence** (WeatherAPI live current conditions + Open-Meteo 10-day agronomic forecasts).
+3. **Growing Degree Day (GDD) & Machine Learning Harvest Predictions** (AI-2).
+4. **Agro-Climatic Suitability & Pest Risk Forecasting** (AI-4).
+5. **Supervised Yield Regressors** (HistGradientBoosting in tonnes/hectare) (AI-5).
+6. **Computer Vision Crop Disease Diagnostics** (DigiGreen Vision classifier) (AI-6).
+7. **Grounded RAG Agricultural AI Assistant** (ICAR/FAO accredited citations, zero hallucinations, multi-tenant server tools) (AI-7).
+8. **Personalized Event Alerts & Notification Engine** (Deterministic deduplication, quiet hours, state machines, and in-app Notification Center) (AI-8).
 
 ---
 
-## 🏛️ Next-Level System Architecture
+## 🏛️ Full System Architecture
+
+HarvestWindow employs an enterprise, decoupled multi-service architecture: a **Vite + React 19 Frontend**, an **Express.js API & Security Gateway**, a **FastAPI Python ML & Data Science Service**, and a **MySQL Persistence Layer managed via Prisma ORM**.
 
 ```mermaid
-graph TB
-    %% Styling
-    classDef clientStyle fill:#0f2b1d,stroke:#34d399,stroke-width:2px,color:#ecfdf5;
-    classDef gatewayStyle fill:#0b1d3a,stroke:#38bdf8,stroke-width:2px,color:#f0f9ff;
-    classDef aiStyle fill:#2a1b4e,stroke:#a855f7,stroke-width:2px,color:#faf5ff;
-    classDef dataStyle fill:#2d1b06,stroke:#f59e0b,stroke-width:2px,color:#fffbeb;
-    classDef extStyle fill:#1e293b,stroke:#94a3b8,stroke-width:1.5px,color:#f8fafc;
-
-    subgraph Client["💻 PRESENTATION LAYER (React 19 + TypeScript + Vite)"]
-        UI_Shell["App Shell & Navigation<br/><code>AppShell.tsx</code> / <code>Sidebar.tsx</code>"]
-        UI_Dash["Executive Dashboard<br/><code>DashboardPage.tsx</code>"]
-        UI_Assistant["Agricultural AI Assistant<br/><code>AssistantPage.tsx</code>"]
-        UI_Notif["Notification Center<br/><code>NotificationCenterPage.tsx</code>"]
-        UI_Weather["Weather Intelligence<br/><code>WeatherPage.tsx</code>"]
-        UI_Forecast["Harvest Predictions<br/><code>ForecastPage.tsx</code>"]
-        UI_CropHealth["Vision Health Diagnostics<br/><code>CropHealthPage.tsx</code>"]
+flowchart TD
+    subgraph L1["1. PRESENTATION LAYER (React 19 + TypeScript + Vite)"]
+        UI_Dash["Executive Dashboard & Portfolio Overview"]
+        UI_Assistant["Agricultural AI Assistant (Context-Aware Chat)"]
+        UI_Notif["Notification Center (Alert Badges & Preferences)"]
+        UI_Forecast["Harvest Predictions & GDD Trajectory"]
+        UI_Weather["10-Day Dual-Horizon Weather Intelligence"]
+        UI_CropHealth["Vision Disease Diagnostics & Leaf Scanner"]
+        UI_Crops["Farm & Crop Lifecycle Management"]
     end
-    class UI_Shell,UI_Dash,UI_Assistant,UI_Notif,UI_Weather,UI_Forecast,UI_CropHealth clientStyle;
 
-    subgraph Gateway["🛡️ SECURE APPLICATION GATEWAY (Node.js & Express)"]
-        AuthMid["JWT & Multi-Tenant Isolation Middleware<br/><code>authenticate.js</code> / <code>rateLimiter.js</code>"]
-        APIRoutes["Centralized REST Dispatcher<br/><code>/api/v1/*</code> & <code>/api/*</code>"]
-        ZodValidator["Strict Schema Contract Validation<br/>Zod Schemas"]
+    subgraph L2["2. APPLICATION & SECURITY GATEWAY (Node.js & Express)"]
+        AuthMid["JWT Authentication & Multi-Tenant Scoping"]
+        RateLimiter["Adaptive API Rate Limiting & Helmet Security"]
+        ZodValidator["Strict Schema Contract Validation (Zod)"]
+        AlertScheduler["In-Process Alert Scheduler (15-Min Cycle)"]
     end
-    class AuthMid,APIRoutes,ZodValidator gatewayStyle;
 
-    subgraph AIServices["🧠 INTELLIGENCE & AI ORCHESTRATION PIPELINE"]
-        subgraph PhaseAI7["Phase AI-7: Grounded AI Assistant"]
-            ToolReg["Server-Controlled Tool Registry<br/><code>farmTools.js</code> (User-Scoped)"]
-            RAG["Agronomic BM25 Retriever<br/><code>retriever.js</code> (FAO/ICAR)"]
-            ProviderMgr["LLM Provider Abstraction<br/><code>LocalAgronomicEngine</code> | <code>Gemini</code> | <code>Ollama</code>"]
-        end
-        subgraph PhaseAI8["Phase AI-8: Personalized Alert Engine"]
-            AlertRules["Deterministic Rules Config<br/><code>alertRules.config.js</code>"]
-            AlertDedup["Deterministic Deduplicator<br/><code>alertDeduplicator.js</code>"]
-            AlertScheduler["In-Process Background Scheduler<br/><code>alertScheduler.js</code> (15m tick)"]
-        end
-        subgraph CoreAI["Core Predictive AI Engines"]
-            AI2_Harvest["AI-2: Harvest Window Engine<br/>GDD + Phenology Timeline"]
-            AI3_Weather["AI-3: Weather Risk Engine<br/>Rain, Heat & Wind Scoring"]
-            AI5_Yield["AI-5: Yield Regressor<br/>HistGradientBoosting (t/ha)"]
-            AI6_Health["AI-6: Disease Diagnostic<br/>DigiGreen Vision Model"]
-        end
+    subgraph L3["3. PYTHON AI & MACHINE LEARNING SERVICE (FastAPI :8000)"]
+        AI2_GDD["AI-2: Phenology & GDD Prediction Service"]
+        AI4_Suit["AI-4: Crop Suitability & Pest Risk Engine (FAO GAEZ)"]
+        AI5_Yield["AI-5: Yield Forecaster (HistGradientBoosting)"]
+        AI6_Vision["AI-6: DigiGreen Leaf Disease Diagnostic Engine"]
+        ML_Pipelines["Data Pipelines & Pretrained Models"]
     end
-    class ToolReg,RAG,ProviderMgr,AlertRules,AlertDedup,AlertScheduler,AI2_Harvest,AI3_Weather,AI5_Yield,AI6_Health aiStyle;
 
-    subgraph DataLayer["💾 PERSISTENCE & KNOWLEDGE STORAGE (MySQL + Prisma)"]
-        DB_Farms["Farms & Crops Master<br/><code>farms</code> / <code>crops</code>"]
-        DB_Predictions["Harvest & Yield Predictions<br/><code>harvest_predictions</code> / <code>yield_predictions</code>"]
-        DB_Weather["Weather Risk Assessments<br/><code>weather_assessments</code>"]
-        DB_Alerts["Notifications & Preferences<br/><code>notifications</code> / <code>user_settings</code>"]
-        DB_Knowledge["Agronomic Knowledge Corpus<br/><code>agricultural_knowledge_documents</code>"]
-        DB_Chat["Conversation Sessions & Audits<br/><code>assistant_conversations</code> / <code>messages</code>"]
+    subgraph L4["4. AGRONOMIC RAG & REASONING HUB (Phase AI-7 & AI-8)"]
+        ServerTools["Server-Controlled Farm Tool Registry (User-Scoped)"]
+        BM25_Retriever["BM25 Agronomic Knowledge Retriever"]
+        LocalEngine["Zero-Cost Agronomic Synthesis Engine"]
+        LLM_Adapter["Pluggable LLM Manager (Gemini / OpenAI / Ollama)"]
+        RuleEngine["Deterministic Alert Rule & Lifecycle Engine"]
+        Deduplicator["Deterministic Deduplicator Key Generator"]
     end
-    class DB_Farms,DB_Predictions,DB_Weather,DB_Alerts,DB_Knowledge,DB_Chat dataStyle;
 
-    subgraph External["🌐 ACCREDITED AGRICULTURAL SOURCES & SATELLITES"]
-        FAO_ICAR["FAO, ICAR, IISS, PAU, TNAU<br/>Agronomic Reference Guides"]
-        OpenMeteo["Open-Meteo & WeatherAPI<br/>10-Day Dual-Horizon Microclimate"]
+    subgraph L5["5. PERSISTENCE LAYER (MySQL 8.0 + Prisma ORM)"]
+        DB_Users["users / refresh_tokens / user_settings"]
+        DB_Farms["farms / crops / crop_calendars"]
+        DB_Predictions["harvest_predictions / yield_predictions"]
+        DB_Assessments["weather_assessments / crop_health_analyses"]
+        DB_Alerts["notifications / activities"]
+        DB_Knowledge["agricultural_knowledge_documents / crop_masters"]
     end
-    class FAO_ICAR,OpenMeteo extStyle;
 
-    %% Data Flow Connections
-    Client -->|Bearer JWT HTTP Requests| Gateway
-    Gateway --> AIServices
-    AIServices -->|Prisma ORM Queries| DataLayer
-    AIServices -->|Real-Time Forecasts| OpenMeteo
-    RAG -->|Semantic Query & Citations| DB_Knowledge
-    FAO_ICAR -.->|Ingestion Pipeline / Checksum| DB_Knowledge
-    AlertScheduler -->|Idempotent Monitoring| AlertDedup
-    AlertDedup -->|Persist Active / Expire Stale| DB_Alerts
-    DB_Alerts -->|Live Badge & Center| UI_Notif
-    ProviderMgr -->|Source-Grounded Response| UI_Assistant
+    subgraph L6["6. EXTERNAL METEOROLOGY & ACCREDITED SOURCES"]
+        WeatherAPIs["Dual Weather: WeatherAPI + Open-Meteo 10-Day"]
+        AccreditedSources["FAO, ICAR, ICAR-IISS, PAU, TNAU Reference Guides"]
+    end
+
+    %% Connections
+    L1 ==>|Bearer JWT HTTP Requests| L2
+    L2 -->|Inter-Service REST Calls| L3
+    L2 -->|Context Injection & RAG Dispatch| L4
+    L2 -->|Prisma Client CRUD| L5
+    L3 -->|Feature Engineering & Inference| L5
+    L4 -->|Semantic Token Search| DB_Knowledge
+    L4 -->|Idempotent Alert Upserts| DB_Alerts
+    L2 -->|Forecast Ingestion| WeatherAPIs
+    AccreditedSources -.->|ETL Checksum Ingestion| DB_Knowledge
 ```
+
+---
+
+## ⚡ Complete Implementation Matrix (Phases 1–9 & AI-1 to AI-8)
+
+Every phase requested has been implemented, tested, and integrated:
+
+| Phase | Category | Status | Technical Implementation & Capabilities |
+| :--- | :--- | :---: | :--- |
+| **Phase 1** | Security | ✅ Active | JWT Bearer authentication, HTTP-only refresh tokens, Argon2id hashing, and multi-tenant scoping. |
+| **Phase 2** | Farms | ✅ Active | Multi-tenant farm records, geographic boundaries, soil profiling, acreage unit normalization. |
+| **Phase 3** | Crops | ✅ Active | Crop varieties, sowing dates, phenological stages (Germination $\to$ Vegetative $\to$ Flowering $\to$ Maturity). |
+| **Phase 4** | Weather | ✅ Active | Dual-Horizon Meteorological Engine: WeatherAPI (3-Day live) + Open-Meteo (10-Day GDD forecast). |
+| **Phase 5** | Predictions | ✅ Active | Growing Degree Day (GDD) accumulation vs base temperature thresholds with weather adjustments. |
+| **Phase 6** | Guidance | ✅ Active | Deterministic Rules A–G (Irrigation pause, heat stress, drainage alerts) with complete lifecycles. |
+| **Phase 9** | Activity | ✅ Active | Persistent activity feeds, audit logging, alert deduplication, and topbar unread notification bell. |
+| **AI-1** | Knowledge | ✅ Active | Canonical Crop Master, varieties, crop calendars, growth profiles, verified reference data sources. |
+| **AI-2** | Harvest ML | ✅ Active | Machine learning & agronomic GDD baseline predicting harvest readiness windows. |
+| **AI-3** | Weather Risk | ✅ Active | Mathematical risk scoring (0–100) across precipitation, humidity, wind, and temperature extremes. |
+| **AI-4** | Suitability | ✅ Active | Agro-climatic suitability scoring and pest/disease early warning forecasting (FAO GAEZ integration). |
+| **AI-5** | Yield ML | ✅ Active | HistGradientBoosting regressor predicting crop yield in tonnes/hectare and expected production. |
+| **AI-6** | Vision AI | ✅ Active | Computer vision crop disease classifier (DigiGreen Vision dataset) diagnosing leaf ailments. |
+| **AI-7** | **AI Assistant** | ✅ **Active** | **Context-aware conversational RAG grounded in FAO/ICAR citations, server tools, & zero-cost engine.** |
+| **AI-8** | **Alert Engine** | ✅ **Active** | **Personalized monitoring, deterministic deduplication, quiet hours, and in-app Notification Center.** |
 
 ---
 
 ## 🤖 Phase AI-7: Agricultural AI Assistant
 
-The Agricultural AI Assistant is a **context-aware conversational intelligence system** capable of answering complex farming queries with zero hallucinations, grounded exclusively in the farmer’s authorized farm data and accredited agricultural scientific research.
-
-### Conversational Architecture & Tool Execution Flow
+The Agricultural AI Assistant is a **conversational intelligence system** designed to explain predictions, synthesize risks, and provide grounded agronomic recommendations.
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor Farmer as 👨‍🌾 Authenticated Farmer
     participant UI as React Assistant UI
-    participant Backend as Express Chat Controller
-    participant Tools as Server-Controlled Farm Tools
+    participant Backend as Express API Gateway
+    participant Tools as Server-Controlled Tools
     participant RAG as BM25 Knowledge Retriever
-    participant Synth as Local Agronomic Synthesis Engine
+    participant Synth as Local Agronomic Engine
     participant DB as MySQL (Prisma)
 
-    Farmer->>UI: Types query: "When is my wheat ready and are there rain risks?"
+    Farmer->>UI: Submits query: "When is my wheat ready and are there rain risks?"
     UI->>Backend: POST /api/v1/ai/assistant/chat (message, farmId, conversationId)
     Backend->>Backend: Authenticate Bearer JWT & verify farm ownership
     
     par Authorized Farm Context
         Backend->>Tools: get_harvest_prediction(cropId)
         Tools->>DB: Query latest GDD & maturity dates
-        Tools-->>Backend: Return window: Oct 18 - Oct 25, GDD 100%
+        Tools-->>Backend: Window: Oct 18 - Oct 25, GDD 100%
         Backend->>Tools: get_weather_risk(farmId)
-        Tools->>DB: Query latest weather assessment
-        Tools-->>Backend: Return risk: 68/100 (Caution: 18mm rain expected)
-    and Authoritative RAG Retrieval
+        Tools->>DB: Query latest weather risk assessment
+        Tools-->>Backend: Risk: 68/100 (Caution: 18mm rain expected)
+    and Verified RAG Retrieval
         Backend->>RAG: retrieveAgriculturalKnowledge(query, "Wheat")
-        RAG->>DB: BM25 token match against FAO/ICAR documents
-        RAG-->>Backend: Return verified chunks & institutional citations
+        RAG->>DB: BM25 token match against FAO/ICAR corpus
+        RAG-->>Backend: Verified passages & institutional citations
     end
 
     Backend->>Synth: Synthesize grounded response(farmContext, citations, language)
@@ -159,18 +175,20 @@ sequenceDiagram
     UI-->>Farmer: Render formatted response with clickable FAO/ICAR citation cards
 ```
 
-### Key Assistant Capabilities
-- **Harvest Window Explanation**: Translates accumulated Growing Degree Days (GDD), base temperatures ($T_{\text{base}} = 5^\circ\text{C}$ for wheat), and weather shifts into clear field operational timelines.
-- **Microclimate Weather Synthesis**: Identifies forecast rainfall events crossing harvest windows and calculates drying window closures.
-- **Yield Forecast Interpretation**: Explains ML predicted yield (tonnes/hectare) alongside planted hectares and regional historical baselines.
-- **Crop Disease Scouting Advice**: Translates leaf disease diagnostic classifications from Phase AI-6 into practical Integrated Pest Management (IPM) guidelines.
-- **Strict Multi-Tenant Tool Security**: The LLM never selects arbitrary database tables or executes raw SQL/shell commands. All tools verify `userId` ownership on every query.
+### Key Technical Pillars of AI-7:
+- **Zero-Cost Local Agronomic Synthesis Engine**: Ships with a deterministic agronomic synthesis engine running entirely on-device with **zero external API costs**. Automatically switches to Google Gemini, OpenAI, or Ollama if configured in `.env`.
+- **Accredited Source Registry**: Grounded strictly in FAO, ICAR (Headquarters), ICAR-IISS (Bhopal), ICAR-CRIDA (Hyderabad), Punjab Agricultural University (PAU), Tamil Nadu Agricultural University (TNAU), and India Meteorological Department (IMD).
+- **Server-Controlled Farm Tools**: Read-only tools verify authenticated `userId` ownership on every query:
+  - `get_user_farms`, `get_farm_summary`, `get_crop_details`
+  - `get_harvest_prediction`, `get_weather_risk`, `get_yield_prediction`
+  - `get_crop_health_analysis`, `get_recent_alerts`, `search_agricultural_knowledge`
+- **Anti-Hallucination & Anti-Injection Guarantee**: The LLM cannot execute raw SQL, shell commands, or arbitrary URLs. Private farm data belonging to other users is completely inaccessible.
 
 ---
 
 ## 🔔 Phase AI-8: Personalized Alerts & Recommendation Engine
 
-Phase AI-8 provides an **autonomous, deterministic monitoring system** that evaluates live farm data, weather changes, and crop maturity to alert farmers at the optimal time with clear, actionable recommendations.
+Phase AI-8 provides an **autonomous, deterministic monitoring system** that evaluates live farm records, weather shifts, and crop maturity to alert farmers with actionable recommendations.
 
 ### Deterministic Alert Rules Engine
 
@@ -211,25 +229,21 @@ $$\text{DedupKey} = \texttt{dedup:\{userId\}:\{farmId\}:\{cropId\}:\{eventType\}
 
 ---
 
-## 🗺️ Complete Phases Breakdown (1 to 9 & AI-1 to AI-8)
+## 🧮 Mathematical & Agronomic Foundations
 
-| Phase | Title | Status | Core Technical Architecture |
-| :--- | :--- | :---: | :--- |
-| **Phase 1** | Authentication & RBAC | ✅ Production | JWT access tokens + HTTP-only refresh tokens, Argon2id password hashing, multi-tenant scoping. |
-| **Phase 2** | Farm Management | ✅ Production | Multi-farm acreage, soil type profiling, irrigation source tagging, and geographic bounding. |
-| **Phase 3** | Crop Management | ✅ Production | Phenological stages (Germination $\to$ Vegetative $\to$ Flowering $\to$ Grain Filling), variety tracking. |
-| **Phase 4** | Weather Intelligence | ✅ Production | Dual-Horizon meteorological synthesis: WeatherAPI (3-Day live) + Open-Meteo (10-Day agronomic). |
-| **Phase 5** | Harvest Forecast Engine | ✅ Production | Growing Degree Day (GDD) accumulation vs base temperature thresholds with weather adjustments. |
-| **Phase 6** | Contextual Recommendations | ✅ Production | Deterministic Rules A–G (irrigation pause, heat stress, drainage alerts) with lifecycle states. |
-| **Phase 9** | Activity Feed & Alerts | ✅ Production | Persistent user activity logging, in-app notification center, and unread bell badge. |
-| **AI-1** | Agricultural Knowledge Foundation | ✅ Production | Canonical Crop Master, varieties, crop calendars, growth profiles, and verified data sources. |
-| **AI-2** | Harvest Prediction AI | ✅ Production | ML & Agronomic baseline prediction comparing cumulative GDD against target maturity. |
-| **AI-3** | Weather Risk Engine | ✅ Production | Mathematical risk scoring (0–100) across precipitation, humidity, wind, and temperature extremes. |
-| **AI-4** | Crop Suitability & Disease Risk | ✅ Production | Agro-climatic suitability scoring and disease risk forecasting. |
-| **AI-5** | Yield Forecasting Engine | ✅ Production | Machine learning regressors (HistGradientBoosting) predicting production in tonnes/hectare. |
-| **AI-6** | Crop Disease Diagnostics | ✅ Production | Computer vision leaf image analysis (DigiGreen model) classifying crop health conditions. |
-| **AI-7** | **Agricultural AI Assistant** | ✅ **Production** | **Grounded RAG assistant with verified FAO/ICAR citations, server-controlled tools, & zero-cost engine.** |
-| **AI-8** | **Personalized Alert Engine** | ✅ **Production** | **Automated monitoring, deterministic deduplication, quiet hours, and in-app Notification Center.** |
+### 1. Growing Degree Day (GDD) Formulation (Phase AI-2)
+Harvest readiness is modeled via thermal unit accumulation:
+$$\text{GDD} = \sum_{t=\text{sowing}}^{\text{today}} \max\left(0, \frac{T_{\max}(t) + T_{\min}(t)}{2} - T_{\text{base}}\right)$$
+Where $T_{\text{base}}$ is crop-specific (e.g., $5.0^\circ\text{C}$ for Wheat, $10.0^\circ\text{C}$ for Maize, $15.5^\circ\text{C}$ for Cotton).
+
+### 2. BM25 Semantic Relevance Retrieval (Phase AI-7)
+Agronomic document chunks are scored against user queries:
+$$\text{Score}(D, Q) = \sum_{q \in Q} \text{IDF}(q) \cdot \frac{f(q, D) \cdot (k_1 + 1)}{f(q, D) + k_1 \cdot \left(1 - b + b \cdot \frac{|D|}{\text{avgdl}}\right)} + \text{Boost}_{\text{title}} + \text{Boost}_{\text{crop}}$$
+
+### 3. Machine Learning Crop Yield Estimation (Phase AI-5)
+Yield prediction leverages HistGradientBoosting regression trained on historical district observations:
+$$\hat{Y} = f\left(\text{Crop}, \text{Season}, \text{State}, \text{Rainfall}, \text{Fertilizer}, \text{Pesticide}, \text{Area}\right)$$
+$$\text{Total Production (Tonnes)} = \hat{Y} \times \text{Planted Area (Hectares)}$$
 
 ---
 
@@ -237,107 +251,27 @@ $$\text{DedupKey} = \texttt{dedup:\{userId\}:\{farmId\}:\{cropId\}:\{eventType\}
 
 ### Phase AI-7: Agricultural Assistant Endpoints
 
-#### 1. Public Readiness Status
-```http
-GET /api/v1/ai/assistant/status
-```
-```json
-{
-  "success": true,
-  "data": {
-    "status": "ready",
-    "service": "HarvestWindow Agricultural AI Assistant (Phase AI-7)",
-    "activeProvider": "local-agronomic-engine",
-    "zeroCostMode": true,
-    "knowledgeDocumentsCount": 10,
-    "trustedSources": ["FAO", "ICAR", "ICAR-IISS", "ICAR-CRIDA", "PAU", "TNAU", "IMD"],
-    "supportedLanguages": ["en", "hi", "gu", "mr", "pa", "ta", "te"]
-  }
-}
-```
-
-#### 2. Chat Query Execution
-```http
-POST /api/v1/ai/assistant/chat
-Authorization: Bearer <JWT_TOKEN>
-Content-Type: application/json
-
-{
-  "message": "When should I harvest my wheat and what are the rainfall risks?",
-  "farmId": "farm_cm123456789",
-  "language": "en"
-}
-```
-```json
-{
-  "success": true,
-  "data": {
-    "conversationId": "conv_cm987654321",
-    "messageId": "msg_cm11223344",
-    "answer": "🌾 Harvest Window Analysis for Wheat (HD-3086):\nBased on cumulative Growing Degree Days (GDD) and local microclimate data, your optimal harvest window is projected from Oct 18 through Oct 25...",
-    "sources": [
-      {
-        "title": "Wheat Crop Management & Harvest Timing Guide",
-        "url": "https://icar.org.in/wheat-guidelines",
-        "publisher": "ICAR / PAU",
-        "publicationDate": "2024-03-15"
-      }
-    ],
-    "farmContextUsed": true,
-    "relatedEntities": [
-      { "type": "farm", "id": "farm_cm123456789", "name": "Green Valley Farm" },
-      { "type": "crop", "id": "crop_cm55667788", "name": "Wheat" }
-    ],
-    "generatedAt": "2026-10-11T10:45:00.000Z"
-  }
-}
-```
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/v1/ai/assistant/status` | Public operational readiness, active provider, supported languages, trusted sources. |
+| `POST` | `/api/v1/ai/assistant/chat` | Processes authenticated queries with context retrieval, server tools, and citations. |
+| `GET` | `/api/v1/ai/assistant/conversations` | Lists user chat sessions with pagination. |
+| `GET` | `/api/v1/ai/assistant/conversations/:id` | Retrieves full message history and citations for a conversation. |
+| `DELETE`| `/api/v1/ai/assistant/conversations/:id` | Deletes a conversation session. |
+| `POST` | `/api/v1/ai/assistant/knowledge/seed` | Triggers knowledge base ingestion and seeding. |
 
 ### Phase AI-8: Notification Center Endpoints
 
-#### 1. List Notifications
-```http
-GET /api/v1/notifications?limit=20&page=1&status=ACTIVE
-Authorization: Bearer <JWT_TOKEN>
-```
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "notif_cm12345",
-      "type": "harvest",
-      "severity": "high",
-      "title": "Harvest Window Active: Soybean",
-      "message": "Soybean on Sunrise Farm is within its optimal harvest window (Oct 12 - Oct 17).",
-      "recommendedAction": "Inspect field maturity (grain moisture/pod shattering resistance) and initiate harvesting operations.",
-      "actionUrl": "/app/crops/crop_cm998877",
-      "isRead": false,
-      "status": "ACTIVE",
-      "at": "2026-10-11T09:30:00.000Z"
-    }
-  ],
-  "unreadCount": 1
-}
-```
-
-#### 2. Manage Notification Preferences
-```http
-PUT /api/v1/notifications/preferences
-Authorization: Bearer <JWT_TOKEN>
-Content-Type: application/json
-
-{
-  "harvestWindowAlerts": true,
-  "weatherCautions": true,
-  "predictionChangeAlerts": true,
-  "cropHealthAlerts": true,
-  "yieldAlerts": true,
-  "quietHoursStart": 22,
-  "quietHoursEnd": 6,
-  "minSeverity": "medium"
-}
-```
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/v1/notifications` | Lists active notifications with filtering (`isRead`, `status`, `severity`, `type`) and pagination. |
+| `GET` | `/api/v1/notifications/unread-count` | Returns unread notification count. |
+| `PATCH`| `/api/v1/notifications/:id/read` | Marks a single notification as read. |
+| `PATCH`| `/api/v1/notifications/read-all` | Marks all notifications as read. |
+| `PATCH`| `/api/v1/notifications/:id/dismiss` | Soft-dismisses an alert. |
+| `GET` | `/api/v1/notifications/preferences` | Retrieves user alert preferences, quiet hours, and minimum severity. |
+| `PUT` | `/api/v1/notifications/preferences` | Updates alert categories, quiet hours, and severity thresholds. |
+| `POST` | `/api/v1/notifications/evaluate` | Evaluates real farm records and triggers live alert generation. |
 
 ---
 
@@ -404,11 +338,12 @@ ok 3 - Phase AI-7: Agricultural AI Assistant Tests (10/10 PASSED)
 
 ### Prerequisites
 - **Node.js**: `v20.x` or higher
+- **Python**: `3.10+`
 - **MySQL**: `8.0+` running on `localhost:3306`
 
 ### 1. Database & Backend Setup
 ```bash
-cd backend
+cd HarvestWindow/backend
 npm install
 
 # Copy environment template
@@ -426,9 +361,19 @@ npm run dev
 # Backend listening on http://localhost:5000
 ```
 
-### 2. Frontend Client Setup
+### 2. Python AI & ML Service Setup (Optional for Local ML Models)
 ```bash
-cd frontend
+cd HarvestWindow/AI
+pip install -r requirements.txt
+
+# Start FastAPI server on port 8000
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+# API docs available at http://localhost:8000/docs
+```
+
+### 3. Frontend Client Setup
+```bash
+cd HarvestWindow/frontend
 npm install
 
 # Launch Vite development server
@@ -436,9 +381,9 @@ npm run dev
 # Frontend live on http://localhost:5173
 ```
 
-### 3. Production Build Validation
+### 4. Production Build Validation
 ```bash
-cd frontend
+cd HarvestWindow/frontend
 npm run build
 # Compiles React 19 + TypeScript bundle with zero errors in ~29s
 ```
